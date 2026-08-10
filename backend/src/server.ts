@@ -202,6 +202,9 @@ if (!process.env.VERCEL) {
   server.listen({ port: PORT, host: '0.0.0.0' }, () => {
     console.log(`Backend listening on http://localhost:${PORT}`);
     console.log(`LAN reachable at http://${LAN_IP}:${PORT}`);
+    console.log(`\n==========================================`);
+    console.log(`🔑 ACTIVE PAIRING CODE: ${auth.getPairingCode()}`);
+    console.log(`==========================================\n`);
   });
 }
 
