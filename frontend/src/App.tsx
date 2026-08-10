@@ -33,14 +33,24 @@ interface Toast {
 }
 
 const App: React.FC = () => {
-  const [isLocal, setIsLocal] = useState(true);
+  const [isLocal, setIsLocal] = useState(() => {
+    const host = window.location.hostname;
+    return !host || host === 'localhost' || host === '127.0.0.1' || host === '::1';
+  });
   const [serverState, setServerState] = useState<ServerState | null>(null);
   const [config, setConfig] = useState<DeckConfig | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [isWsConnected, setIsWsConnected] = useState(false);
   
   // Auth state
-  const [isPaired, setIsPaired] = useState(true);
+  const [isPaired, setIsPaired] = useState(() => {
+    const host = window.location.hostname;
+    const local = !host || host === 'localhost' || host === '127.0.0.1' || host === '::1';
+    if (!local) {
+      return !!(localStorage.getItem('webpcdeck_token') && localStorage.getItem('webpcdeck_backend_ip'));
+    }
+    return true;
+  });
   const [pairingCodeInput, setPairingCodeInput] = useState('');
   const [pcIpInput, setPcIpInput] = useState(localStorage.getItem('webpcdeck_backend_ip') || '');
   
@@ -91,8 +101,11 @@ const App: React.FC = () => {
       setIsPaired(true);
     } catch (err) {
       console.error('Failed to connect to backend:', err);
-      // For remote clients, verify token check failed
-      if (getPairingToken()) {
+      const host = window.location.hostname;
+      const local = !host || host === 'localhost' || host === '127.0.0.1' || host === '::1';
+      if (!local) {
+        setIsPaired(false);
+      } else if (getPairingToken()) {
         clearPairingToken();
         setIsPaired(false);
       }
