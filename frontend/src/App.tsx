@@ -991,7 +991,7 @@ const App: React.FC = () => {
             {isLocal && serverState && (
               <div className="glass" style={{ padding: '24px', borderRadius: '16px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
                 <h3 style={{ fontSize: '14px', fontWeight: 700, marginBottom: '16px' }}>Host Server Connection</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '20px', marginBottom: '20px' }}>
                   <div>
                     <span style={{ display: 'block', fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '6px' }}>ACTIVE PAIRING CODE</span>
                     <span style={{ fontFamily: 'monospace', fontSize: '20px', fontWeight: 800, color: 'var(--primary)' }}>{serverState.pairingCode}</span>
@@ -999,6 +999,42 @@ const App: React.FC = () => {
                   <div>
                     <span style={{ display: 'block', fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '6px' }}>MOBILE LAN IP URL</span>
                     <code style={{ fontSize: '12px' }}>http://{serverState.lanIp}:{serverState.port}</code>
+                  </div>
+                  <div>
+                    <span style={{ display: 'block', fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '6px' }}>CLOUDFLARE TUNNEL URL</span>
+                    {serverState.tunnelUrl ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <code style={{ fontSize: '12px', color: '#10b981', background: 'rgba(16, 185, 129, 0.05)', padding: '2px 6px', borderRadius: '4px', wordBreak: 'break-all' }}>
+                          {serverState.tunnelUrl}
+                        </code>
+                        <button 
+                          onClick={async () => {
+                            try {
+                              await navigator.clipboard.writeText(serverState.tunnelUrl!);
+                              showToast('Tunnel URL copied!', 'success');
+                            } catch {}
+                          }}
+                          style={{
+                            background: 'rgba(255,255,255,0.05)',
+                            border: 'none',
+                            color: 'var(--text-secondary)',
+                            cursor: 'pointer',
+                            padding: '4px 8px',
+                            borderRadius: '4px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            fontSize: '11px'
+                          }}
+                          title="Copy Link"
+                        >
+                          Copy
+                        </button>
+                      </div>
+                    ) : (
+                      <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                        Connecting / Starting...
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: '10px' }}>
@@ -1063,7 +1099,7 @@ const App: React.FC = () => {
 
             {/* Drawer Content */}
             <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px' }}>
                 <div>
                   <span style={{ display: 'block', fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '6px' }}>PAIRING CODE</span>
                   <span 
@@ -1090,6 +1126,39 @@ const App: React.FC = () => {
                 <div>
                   <span style={{ display: 'block', fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '6px' }}>LAN IP</span>
                   <code style={{ fontSize: '12px' }}>http://{serverState.lanIp}:{serverState.port}</code>
+                </div>
+                <div>
+                  <span style={{ display: 'block', fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '6px' }}>CLOUDFLARE TUNNEL URL</span>
+                  {serverState.tunnelUrl ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <code style={{ fontSize: '12px', color: '#10b981', background: 'rgba(16, 185, 129, 0.05)', padding: '2px 6px', borderRadius: '4px', wordBreak: 'break-all' }}>
+                        {serverState.tunnelUrl}
+                      </code>
+                      <button 
+                        onClick={async () => {
+                          try {
+                            await navigator.clipboard.writeText(serverState.tunnelUrl!);
+                            showToast('Tunnel URL copied!', 'success');
+                          } catch {}
+                        }}
+                        style={{
+                          background: 'rgba(255,255,255,0.05)',
+                          border: 'none',
+                          color: 'var(--text-secondary)',
+                          cursor: 'pointer',
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          fontSize: '10px'
+                        }}
+                      >
+                        Copy
+                      </button>
+                    </div>
+                  ) : (
+                    <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                      Starting...
+                    </span>
+                  )}
                 </div>
               </div>
             </div>

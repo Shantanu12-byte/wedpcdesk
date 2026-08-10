@@ -3,7 +3,7 @@ import http from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import cors from 'cors';
 import os from 'os';
-import { exec } from 'child_process';
+import { exec, spawn } from 'child_process';
 import url from 'url';
 import path from 'path';
 import fs from 'fs';
@@ -41,6 +41,74 @@ function getLanIp(): string {
 
 const LAN_IP = getLanIp();
 
+let cloudflaredProcess: any = null;
+let activeTunnelUrl: string | null = null;
+
+function startCloudflaredTunnel() {
+  console.log('[Tunnel] Starting cloudflared quick tunnel...');
+  cloudflaredProcess = spawn('cloudflared', ['tunnel', '--url', `http://localhost:${PORT}`], {
+    shell: true,
+  });
+
+  cloudflaredProcess.stdout.on('data', (data: Buffer) => {
+    parseTunnelUrl(data.toString());
+  });
+
+  cloudflaredProcess.stderr.on('data', (data: Buffer) => {
+    parseTunnelUrl(data.toString());
+  });
+
+  cloudflaredProcess.on('error', (err: any) => {
+    console.error('[Tunnel] Failed to start cloudflared process:', err.message);
+  });
+
+  cloudflaredProcess.on('close', (code: number) => {
+    console.log(`[Tunnel] cloudflared process exited with code ${code}`);
+    activeTunnelUrl = null;
+    cloudflaredProcess = null;
+  });
+}
+
+function parseTunnelUrl(text: string) {
+  const match = text.match(/https:\/\/[a-zA-Z0-9-]+\.trycloudflare\.com/);
+  if (match) {
+    activeTunnelUrl = match[0];
+    console.log(`\n==========================================`);
+    console.log(`☁️ CLOUDFLARE TUNNEL ACTIVE: ${activeTunnelUrl}`);
+    console.log(`==========================================\n`);
+  }
+}
+
+function cleanupTunnel() {
+  if (cloudflaredProcess) {
+    console.log('[Tunnel] Terminating cloudflared process...');
+    try {
+      if (process.platform === 'win32') {
+        exec(`taskkill /pid ${cloudflaredProcess.pid} /t /f`, () => {});
+      } else {
+        cloudflaredProcess.kill();
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+}
+
+process.on('SIGINT', () => {
+  cleanupTunnel();
+  process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+  cleanupTunnel();
+  process.exit(0);
+});
+
+process.on('exit', () => {
+  cleanupTunnel();
+});
+
+
 // Middleware: Authenticate incoming HTTP requests
 function authenticateRequest(req: Request, res: Response, next: NextFunction) {
   const clientIp = req.socket.remoteAddress || req.ip;
@@ -71,6 +139,7 @@ app.get('/api/state', (req: Request, res: Response) => {
     pairingCode: isLocal ? auth.getPairingCode() : '******',
     connectedClients: wss.clients.size,
     isLocal,
+    tunnelUrl: activeTunnelUrl,
   });
 });
 
@@ -285,6 +354,7 @@ if (!process.env.VERCEL) {
     console.log(`\n==========================================`);
     console.log(`🔑 ACTIVE PAIRING CODE: ${auth.getPairingCode()}`);
     console.log(`==========================================\n`);
+    startCloudflaredTunnel();
   });
 }
 

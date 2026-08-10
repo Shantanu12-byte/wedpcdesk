@@ -36,4 +36,5 @@ export interface ServerState {
   port: number;
   pairingCode: string;
   connectedClients: number;
+  tunnelUrl?: string | null;
 }
