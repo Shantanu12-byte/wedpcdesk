@@ -4,7 +4,9 @@ const BACKEND_PORT = 5001;
 
 export function getBackendHost(): string {
   const customIp = localStorage.getItem('webpcdeck_backend_ip');
-  if (customIp) return customIp;
+  if (customIp) {
+    return customIp.replace(/^https?:\/\//, '');
+  }
 
   const host = window.location.hostname;
   // Default to localhost if hostname is empty (e.g. file:// protocol in Electron) or local loopback
@@ -17,6 +19,13 @@ export function getBackendHost(): string {
 export function getBaseUrl(): string {
   const customIp = localStorage.getItem('webpcdeck_backend_ip');
   if (customIp) {
+    if (customIp.startsWith('http://') || customIp.startsWith('https://')) {
+      return customIp;
+    }
+    // If it's a domain name (like ngrok, localtunnel)
+    if (customIp.includes('ngrok') || customIp.includes('loca.lt') || customIp.includes('.')) {
+      return `https://${customIp}`;
+    }
     return `http://${customIp}:${BACKEND_PORT}`;
   }
 
@@ -37,7 +46,15 @@ export function getBaseUrl(): string {
 export function getWsUrl(): string {
   const token = getPairingToken();
   const tokenParam = token ? `?token=${encodeURIComponent(token)}` : '';
-  return `ws://${getBackendHost()}:${BACKEND_PORT}/ws${tokenParam}`;
+  const host = getBackendHost();
+
+  if (host.includes('ngrok') || host.includes('loca.lt')) {
+    const isSecure = window.location.protocol === 'https:' || localStorage.getItem('webpcdeck_backend_ip')?.startsWith('https');
+    const protocol = isSecure ? 'wss' : 'ws';
+    return `${protocol}://${host}/ws${tokenParam}`;
+  }
+  
+  return `ws://${host}:${BACKEND_PORT}/ws${tokenParam}`;
 }
 
 export function getPairingToken(): string | null {
@@ -56,6 +73,7 @@ export function clearPairingToken(): void {
 function getHeaders(): HeadersInit {
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
+    'ngrok-skip-browser-warning': '1',
   };
   const token = getPairingToken();
   if (token) {
@@ -66,7 +84,9 @@ function getHeaders(): HeadersInit {
 
 // REST API calls
 export async function getServerState(): Promise<ServerState & { isLocal: boolean }> {
-  const res = await fetch(`${getBaseUrl()}/api/state`);
+  const res = await fetch(`${getBaseUrl()}/api/state`, {
+    headers: { 'ngrok-skip-browser-warning': '1' }
+  });
   if (!res.ok) throw new Error('Failed to get server state');
   return res.json();
 }
@@ -74,7 +94,10 @@ export async function getServerState(): Promise<ServerState & { isLocal: boolean
 export async function pairWithCode(code: string): Promise<{ success: boolean; token?: string }> {
   const res = await fetch(`${getBaseUrl()}/api/pair`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 
+      'Content-Type': 'application/json',
+      'ngrok-skip-browser-warning': '1'
+    },
     body: JSON.stringify({ code }),
   });
   if (!res.ok) {

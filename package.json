@@ -11,12 +11,39 @@
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\" \"wait-on tcp:5173 && electron .\"",
     "start": "electron .",
     "build:frontend": "npm run build --prefix frontend",
-    "build": "npm run build:frontend"
+    "build": "npm run build:frontend",
+    "package": "electron-builder build --win --x64"
   },
-  "dependencies": {},
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "uuid": "^10.0.0",
+    "ws": "^8.18.0"
+  },
   "devDependencies": {
     "concurrently": "^8.2.2",
     "electron": "^31.3.1",
+    "electron-builder": "^26.15.3",
     "wait-on": "^7.2.0"
+  },
+  "build": {
+    "appId": "com.webpcdeck.app",
+    "productName": "WebPCDeck",
+    "directories": {
+      "output": "dist-app"
+    },
+    "files": [
+      "main.js",
+      "package.json",
+      "tray_icon.png",
+      "shared/**/*",
+      "backend/dist/**/*",
+      "backend/package.json",
+      "backend/node_modules/**/*",
+      "frontend/dist/**/*"
+    ],
+    "win": {
+      "target": "portable"
+    }
   }
 }
