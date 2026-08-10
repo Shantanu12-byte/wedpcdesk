@@ -42,6 +42,7 @@ const App: React.FC = () => {
   // Auth state
   const [isPaired, setIsPaired] = useState(true);
   const [pairingCodeInput, setPairingCodeInput] = useState('');
+  const [pcIpInput, setPcIpInput] = useState(localStorage.getItem('webpcdeck_backend_ip') || '');
   
   // Modals state
   const [activeCellCoord, setActiveCellCoord] = useState<string | null>(null);
@@ -133,6 +134,9 @@ const App: React.FC = () => {
   const handlePairSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      if (!isLocal && pcIpInput.trim()) {
+        localStorage.setItem('webpcdeck_backend_ip', pcIpInput.trim());
+      }
       const result = await pairWithCode(pairingCodeInput);
       if (result.success) {
         setIsPaired(true);
@@ -142,6 +146,9 @@ const App: React.FC = () => {
         setConfig(deckConfig);
       }
     } catch (err: any) {
+      if (!isLocal) {
+        localStorage.removeItem('webpcdeck_backend_ip');
+      }
       showToast(err.message || 'Incorrect pairing code', 'error');
     }
   };
@@ -338,20 +345,44 @@ const App: React.FC = () => {
             Enter the 6-digit pairing code shown on your laptop screen.
           </p>
 
-          <input
-            type="text"
-            placeholder="000000"
-            value={pairingCodeInput}
-            onChange={(e) => setPairingCodeInput(e.target.value.replace(/\D/g, '').slice(0, 6))}
-            style={{ 
-              textAlign: 'center', 
-              fontSize: '32px', 
-              letterSpacing: '8px', 
-              fontWeight: 700, 
-              padding: '12px',
-              marginBottom: '24px'
-            }}
-          />
+          {!isLocal && (
+            <div style={{ marginBottom: '16px', textAlign: 'left' }}>
+              <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: 600 }}>PC IP Address</label>
+              <input
+                type="text"
+                placeholder="e.g. 192.168.1.7"
+                value={pcIpInput}
+                onChange={(e) => setPcIpInput(e.target.value.trim())}
+                style={{ 
+                  textAlign: 'center', 
+                  fontSize: '16px', 
+                  padding: '10px',
+                  width: '100%',
+                  marginBottom: '12px'
+                }}
+                required
+              />
+            </div>
+          )}
+
+          <div style={{ marginBottom: '16px', textAlign: 'left' }}>
+            <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: 600 }}>Pairing Code</label>
+            <input
+              type="text"
+              placeholder="000000"
+              value={pairingCodeInput}
+              onChange={(e) => setPairingCodeInput(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              style={{ 
+                textAlign: 'center', 
+                fontSize: '32px', 
+                letterSpacing: '8px', 
+                fontWeight: 700, 
+                padding: '12px',
+                width: '100%'
+              }}
+              required
+            />
+          </div>
 
           <button type="submit" className="btn btn-primary" style={{ width: '100%', fontSize: '16px', padding: '12px' }}>
             Pair Device
@@ -450,6 +481,8 @@ const App: React.FC = () => {
             <button 
               onClick={() => {
                 clearPairingToken();
+                localStorage.removeItem('webpcdeck_backend_ip');
+                setPcIpInput('');
                 setIsPaired(false);
               }}
               className="btn btn-secondary"

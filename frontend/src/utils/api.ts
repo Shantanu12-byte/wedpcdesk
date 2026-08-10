@@ -3,6 +3,9 @@ import { ActionConfig, DeckConfig, ServerState } from '../../../shared/types';
 const BACKEND_PORT = 5001;
 
 export function getBackendHost(): string {
+  const customIp = localStorage.getItem('webpcdeck_backend_ip');
+  if (customIp) return customIp;
+
   const host = window.location.hostname;
   // Default to localhost if hostname is empty (e.g. file:// protocol in Electron) or local loopback
   if (!host || host === 'localhost' || host === '127.0.0.1' || host === '::1') {
@@ -12,6 +15,11 @@ export function getBackendHost(): string {
 }
 
 export function getBaseUrl(): string {
+  const customIp = localStorage.getItem('webpcdeck_backend_ip');
+  if (customIp) {
+    return `http://${customIp}:${BACKEND_PORT}`;
+  }
+
   const host = window.location.hostname;
   if (
     host &&
