@@ -124,9 +124,17 @@ const ButtonCard: React.FC<ButtonCardProps> = ({
         }
       }}
     >
-      <span style={{ fontSize: '32px', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.15))' }}>
-        {button.icon}
-      </span>
+      {button.icon && (button.icon.startsWith('http') || button.icon.startsWith('/') || button.icon.startsWith('data:image')) ? (
+        <img 
+          src={button.icon} 
+          alt={button.label} 
+          style={{ width: '40px', height: '40px', objectFit: 'contain', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.15))' }} 
+        />
+      ) : (
+        <span style={{ fontSize: '32px', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.15))' }}>
+          {button.icon}
+        </span>
+      )}
       <span
         style={{
           fontSize: '12px',

@@ -38,3 +38,5 @@ config.json
 
 .vercel
 .env*.local
+
+dist-app/

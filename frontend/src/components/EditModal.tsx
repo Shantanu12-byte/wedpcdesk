@@ -20,6 +20,27 @@ const PRESET_EMOJIS = [
   '🎮', '🌐', '📁', '⚙️', '🎵', '🔋', '🚀', '🔥', '💡'
 ];
 
+const PRESET_APPS = [
+  {
+    name: 'Firefox',
+    icon: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48Y2lyY2xlIGN4PSIyNTYiIGN5PSIyNTYiIHI9IjI1NiIgZmlsbD0iI2ZmNzEwMCIvPjxjaXJjbGUgY3g9IjI1NiIgY3k9IjI1NiIgcj0iMjAwIiBmaWxsPSIjMDAzOGE4Ii8+PHBhdGggZmlsbD0iI2ZmZDEwMCIgZD0iTTI1NiAxMDBjLTg2IDAtMTU2IDcwLTE1NiAxNTYgMCA4NiA3MCAxNTYgMTU2IDE1NiA0MCAwIDc2LTE1IDEwNC00MC0zMC01LTUwLTMwLTUwLTYwIDAtMzUgMjUtNjUgNjAtNzAtMTUtNTAtNDUtODAtODYtODYgMCAwLTEwLTMwLTI4LTU2eiIvPjwvc3ZnPg==',
+    color: '#ff7100',
+    path: 'C:\\Program Files\\Mozilla Firefox\\firefox.exe',
+  },
+  {
+    name: 'Spotify',
+    icon: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIiBmaWxsPSIjRkZGIj48Y2lyY2xlIGN4PSIyNTYiIGN5PSIyNTYiIHI9IjI1NiIgZmlsbD0iIzFEQjg1NCIvPjxwYXRoIGQ9Ik0zODIgMzU1Yy02IDgtMTYgMTAtMjQgNS01My0zMi0xMTktMzktMTk4LTIxLTkgMy0xOS00LTIxLTEzczMtMTkgMTMtMjFjODctMjAgMTYxLTEyIDIyMSAyNCA5IDUgMTEgMTYgNiAyNHptMzEtNjZjLTggMTItMjQgMTYtMzYgOC02MS0zOC0xNTQtNDktMjI2LTI3LTE0IDQtMjktNC0zMy0xNy00LTE0IDQtMjkgMTctMzMgODItMjUgMTg1LTEyIDI1NCAzMCAxMiA4IDE2IDI0IDggMzZ6bTMtNzBjLTczLTQ0LTE5NS00OC0yNjYtMjYtMTEgMy0yMy0zLTI2LTE1LTMtMTEgMy0yMyAxNS0yNiA4Mi0yNSAyMTctMjAgMzAxIDMwIDEwIDYgMTMgMjAgNyAzMC02IDExLTIwIDE0LTMxIDd6Ii8+PC9zdmc=',
+    color: '#1db954',
+    path: 'C:\\Users\\shant\\AppData\\Roaming\\Spotify\\Spotify.exe',
+  },
+  {
+    name: 'Valorant',
+    icon: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIiBmaWxsPSIjRkY0NjU1Ij48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgcng9IjEyOCIgZmlsbD0iIzExMTgyNyIvPjxwYXRoIGQ9Ik0yNTYgOTBsLTE0MCAyMTBoNzBsNzAtMTA1IDcwIDEwNWg3MHpNMTg2IDMzMGw3MCAxMDUgNzAtMTA1eiIvPjwvc3ZnPg==',
+    color: '#111827',
+    path: 'C:\\Riot Games\\Riot Client\\RiotClientServices.exe --launch-product=valorant --launch-patchline=live',
+  }
+];
+
 const EditModal: React.FC<EditModalProps> = ({
   isOpen,
   button,
@@ -168,7 +189,15 @@ const EditModal: React.FC<EditModalProps> = ({
                 border: '1px solid rgba(255,255,255,0.15)',
               }}
             >
-              <span style={{ fontSize: '28px' }}>{icon}</span>
+              {icon && (icon.startsWith('http') || icon.startsWith('/') || icon.startsWith('data:image')) ? (
+                <img 
+                  src={icon} 
+                  alt={label} 
+                  style={{ width: '28px', height: '28px', objectFit: 'contain' }} 
+                />
+              ) : (
+                <span style={{ fontSize: '28px' }}>{icon}</span>
+              )}
               <span style={{ fontSize: '10px', fontWeight: 600, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%' }}>
                 {label || 'Label'}
               </span>
@@ -207,6 +236,41 @@ const EditModal: React.FC<EditModalProps> = ({
         {/* Action Configuration */}
         <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '20px', marginBottom: '20px' }}>
           <h3 style={{ fontSize: '14px', fontWeight: 600, marginBottom: '12px', color: 'var(--text-secondary)' }}>Action Settings</h3>
+          
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>Quick App Presets</label>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              {PRESET_APPS.map(app => (
+                <button
+                  key={app.name}
+                  type="button"
+                  onClick={() => {
+                    setLabel(app.name);
+                    setIcon(app.icon);
+                    setColor(app.color);
+                    setActionType('launch');
+                    setLaunchPath(app.path);
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: '8px',
+                    padding: '6px 12px',
+                    color: 'var(--text-primary)',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                  }}
+                >
+                  <img src={app.icon} alt={app.name} style={{ width: '16px', height: '16px', objectFit: 'contain' }} />
+                  {app.name}
+                </button>
+              ))}
+            </div>
+          </div>
           
           <div style={{ marginBottom: '16px' }}>
             <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px' }}>Action Type</label>

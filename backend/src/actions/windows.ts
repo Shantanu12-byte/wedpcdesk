@@ -56,22 +56,52 @@ export class WindowsActionExecutor implements ActionExecutor {
         cleanPath = cleanPath.slice(1, -1).trim();
       }
 
-      // Use "start" command to launch files, executables or URLs asynchronously and detached
-      // If the path contains spaces, start needs empty quotes as first argument: start "" "path"
-      const command = `start "" "${cleanPath}"`;
-      exec(command, (error) => {
-        if (error) {
-          // Fallback to spawning directly if "start" failed
-          try {
-            const child = spawn(cleanPath, [], { detached: true, stdio: 'ignore' });
-            child.unref();
-            resolve({ success: true });
-          } catch (spawnError: any) {
-            resolve({ success: false, error: `Failed to launch: ${spawnError.message || spawnError}` });
+      // Extract process name to check if already running
+      const baseName = path.basename(cleanPath, '.exe').toLowerCase();
+      const processMappings: Record<string, string> = {
+        'valorant': 'VALORANT-Win64-Shipping',
+      };
+      const processName = processMappings[baseName] || baseName;
+
+      // PowerShell script to check for process and restore/focus window if found
+      const focusPsCommand = `
+        $proc = Get-Process -Name "${processName}" -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1;
+        if ($proc) {
+          $sig = '[DllImport("user32.dll")] public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow); [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);';
+          if (-not ([System.Management.Automation.PSTypeName]'Win32.Window').Type) {
+            Add-Type -MemberDefinition $sig -Name "Window" -Namespace "Win32" -ErrorAction SilentlyContinue;
           }
+          [Win32.Window]::ShowWindowAsync($proc.MainWindowHandle, 9) | Out-Null;
+          [Win32.Window]::SetForegroundWindow($proc.MainWindowHandle) | Out-Null;
+          Write-Output "ACTIVATED";
         } else {
-          resolve({ success: true });
+          Write-Output "NOT_RUNNING";
         }
+      `.trim().replace(/\s+/g, ' ');
+
+      exec(`powershell -Command "${focusPsCommand}"`, (psError, stdout) => {
+        if (!psError && stdout.trim() === 'ACTIVATED') {
+          console.log(`[ACTION] Activated existing window for process: ${processName}`);
+          return resolve({ success: true });
+        }
+
+        // Use "start" command to launch files, executables or URLs asynchronously and detached
+        // If the path contains spaces, start needs empty quotes as first argument: start "" "path"
+        const command = `start "" "${cleanPath}"`;
+        exec(command, (error) => {
+          if (error) {
+            // Fallback to spawning directly if "start" failed
+            try {
+              const child = spawn(cleanPath, [], { detached: true, stdio: 'ignore' });
+              child.unref();
+              resolve({ success: true });
+            } catch (spawnError: any) {
+              resolve({ success: false, error: `Failed to launch: ${spawnError.message || spawnError}` });
+            }
+          } else {
+            resolve({ success: true });
+          }
+        });
       });
     });
   }
