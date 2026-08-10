@@ -82,11 +82,30 @@ const App: React.FC = () => {
   // 1. Initial State Fetch
   const checkStatus = async () => {
     try {
-      const state = await getServerState();
-      setServerState(state);
-      setIsLocal(state.isLocal);
+      let state = null;
+      let localDetected = false;
 
-      if (!state.isLocal) {
+      // First, try connecting to the local backend directly on localhost
+      try {
+        const localRes = await fetch('http://localhost:5001/api/state');
+        if (localRes.ok) {
+          state = await localRes.json();
+          localDetected = true;
+        }
+      } catch (e) {
+        // Local backend not running on this machine (normal for phones/remote browsers)
+      }
+
+      // Fallback to configured base URL if localhost check didn't succeed
+      if (!state) {
+        state = await getServerState();
+      }
+
+      setServerState(state);
+      const isLocalMode = localDetected || state.isLocal;
+      setIsLocal(isLocalMode);
+
+      if (!isLocalMode) {
         // If external client, check if paired
         const token = getPairingToken();
         if (!token) {
