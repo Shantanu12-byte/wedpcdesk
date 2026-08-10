@@ -69,10 +69,12 @@ function startCloudflaredTunnel() {
   });
 
   cloudflaredProcess.stdout.on('data', (data: Buffer) => {
+    console.log(`[Tunnel stdout] ${data.toString().trim()}`);
     parseTunnelUrl(data.toString());
   });
 
   cloudflaredProcess.stderr.on('data', (data: Buffer) => {
+    console.error(`[Tunnel stderr] ${data.toString().trim()}`);
     parseTunnelUrl(data.toString());
   });
 
