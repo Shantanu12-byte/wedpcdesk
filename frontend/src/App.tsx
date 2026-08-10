@@ -11,7 +11,9 @@ import {
   triggerAction,
   DeckSocket, 
   getPairingToken,
-  clearPairingToken
+  clearPairingToken,
+  getPerformanceMetrics,
+  PerformanceData
 } from './utils/api';
 import { 
   Settings, 
@@ -21,7 +23,9 @@ import {
   Plus, 
   Download, 
   Upload, 
-  Trash2
+  Trash2,
+  LayoutGrid,
+  Activity
 } from 'lucide-react';
 
 interface Toast {
@@ -73,6 +77,45 @@ const App: React.FC = () => {
 
   const [isFooterOpen, setIsFooterOpen] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
+
+  const [activeSection, setActiveSection] = useState<'controls' | 'performance' | 'settings'>('controls');
+  const [perfData, setPerfData] = useState<PerformanceData | null>(null);
+  const [isMobileScreen, setIsMobileScreen] = useState(window.innerWidth <= 768);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobileScreen(window.innerWidth <= 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
+    if (activeSection !== 'performance' || !isPaired) {
+      setPerfData(null);
+      return;
+    }
+
+    let active = true;
+    const fetchMetrics = async () => {
+      try {
+        const data = await getPerformanceMetrics();
+        if (active) {
+          setPerfData(data);
+        }
+      } catch (err) {
+        console.error('Failed to fetch performance metrics:', err);
+      }
+    };
+
+    fetchMetrics();
+    const interval = setInterval(fetchMetrics, 2000);
+
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [activeSection, isPaired]);
 
   const [toasts, setToasts] = useState<Toast[]>([]);
   const socketRef = useRef<DeckSocket | null>(null);
@@ -241,6 +284,34 @@ const App: React.FC = () => {
     }
   };
 
+  const handleDeleteProfileById = async (profileId: string) => {
+    if (!config) return;
+    if (config.profiles.length <= 1) {
+      showToast('Cannot delete the last remaining profile', 'error');
+      return;
+    }
+    const profileToDelete = config.profiles.find(p => p.id === profileId);
+    if (!profileToDelete) return;
+    
+    if (window.confirm(`Are you sure you want to delete profile "${profileToDelete.name}"?`)) {
+      const filtered = config.profiles.filter(p => p.id !== profileId);
+      const activeId = config.activeProfileId === profileId ? filtered[0].id : config.activeProfileId;
+      const newConfig = {
+        ...config,
+        profiles: filtered,
+        activeProfileId: activeId,
+      };
+
+      try {
+        setConfig(newConfig);
+        await saveDeckConfig(newConfig);
+        showToast('Profile deleted successfully', 'success');
+      } catch (err) {
+        showToast('Failed to delete profile', 'error');
+      }
+    }
+  };
+
   // Always use HTTP POST for action triggering — avoids stale WS state entirely
   const executeActionNow = useCallback(async (btn: ButtonConfig) => {
     console.log('[DEBUG-App] executeActionNow called for button:', btn.id, 'action:', btn.action);
@@ -352,30 +423,7 @@ const App: React.FC = () => {
     }
   };
 
-  const handleDeleteProfile = async () => {
-    if (!config) return;
-    if (config.profiles.length <= 1) {
-      showToast('Cannot delete the last remaining profile', 'error');
-      return;
-    }
 
-    const filtered = config.profiles.filter(p => p.id !== config.activeProfileId);
-    const newConfig = {
-      ...config,
-      profiles: filtered,
-      activeProfileId: filtered[0].id,
-    };
-
-    if (window.confirm('Are you sure you want to delete this entire profile? All buttons inside it will be lost.')) {
-      try {
-        setConfig(newConfig);
-        await saveDeckConfig(newConfig);
-        showToast('Profile deleted', 'success');
-      } catch (err) {
-        showToast('Failed to delete profile', 'error');
-      }
-    }
-  };
 
   // Import / Export
   const handleExportConfig = () => {
@@ -523,278 +571,532 @@ const App: React.FC = () => {
   }
 
   return (
-    <div style={{ padding: '20px', maxWidth: '1000px', margin: '0 auto', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ display: 'flex', flexDirection: isMobileScreen ? 'column-reverse' : 'row', minHeight: '100vh', background: '#0b0e14', color: '#fff', fontFamily: 'Inter, system-ui, sans-serif' }}>
       
-      {/* Header Panel */}
-      <header className="glass" style={{ padding: '16px 20px', display: 'flex', flexWrap: 'wrap', gap: '16px', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <span style={{ fontSize: '24px' }}>🎛️</span>
-          <div>
-            <h1 style={{ fontSize: '16px', fontWeight: 800, letterSpacing: '-0.5px' }}>WebPCDeck</h1>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
-              <div className={`pulse-dot ${isWsConnected ? '' : 'reconnecting'}`} />
-              <span style={{ fontSize: '11px', fontWeight: 600, color: isWsConnected ? 'var(--text-secondary)' : 'var(--text-muted)' }}>
-                {isWsConnected ? 'Connected' : 'Reconnecting...'}
-              </span>
+      {/* Sidebar Nav */}
+      <aside 
+        style={isMobileScreen ? {
+          position: 'fixed',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          height: '64px',
+          background: 'rgba(18, 20, 26, 0.95)',
+          backdropFilter: 'blur(10px)',
+          borderTop: '1px solid rgba(255, 255, 255, 0.05)',
+          display: 'flex',
+          flexDirection: 'row',
+          justifyContent: 'space-around',
+          alignItems: 'center',
+          padding: '0 16px',
+          zIndex: 100
+        } : {
+          width: '240px', 
+          background: '#12141a', 
+          borderRight: '1px solid rgba(255, 255, 255, 0.05)', 
+          padding: '24px 16px',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          flexShrink: 0
+        }}
+      >
+        {!isMobileScreen && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+            {/* Logo / Brand Header */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingLeft: '8px' }}>
+              <span style={{ fontSize: '28px' }}>🎛️</span>
+              <div>
+                <h1 style={{ fontSize: '15px', fontWeight: 800, letterSpacing: '-0.5px', margin: 0 }}>WebPCDeck</h1>
+                <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>PC Control Center</span>
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
-        {/* Profile Tabs */}
-        {config && (
-          <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px' }}>
-            {config.profiles.map(p => (
-              <button
-                key={p.id}
-                onClick={async () => {
-                  const newCfg = { ...config, activeProfileId: p.id };
-                  setConfig(newCfg);
-                  await saveDeckConfig(newCfg);
-                }}
-                style={{
-                  background: config.activeProfileId === p.id ? 'var(--primary)' : 'rgba(255,255,255,0.03)',
-                  color: config.activeProfileId === p.id ? '#fff' : 'var(--text-secondary)',
-                  border: '1px solid rgba(255,255,255,0.08)',
-                  padding: '8px 14px',
-                  borderRadius: '20px',
-                  cursor: 'pointer',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  transition: 'all var(--transition-fast)'
-                }}
-              >
-                {p.name}
-              </button>
-            ))}
+        {/* Navigation Options */}
+        <nav style={{ 
+          display: 'flex', 
+          flexDirection: isMobileScreen ? 'row' : 'column', 
+          gap: isMobileScreen ? '16px' : '6px',
+          width: isMobileScreen ? '100%' : 'auto',
+          justifyContent: isMobileScreen ? 'space-around' : 'flex-start'
+        }}>
+          <button 
+            onClick={() => setActiveSection('controls')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: isMobileScreen ? 'center' : 'flex-start',
+              gap: '12px',
+              padding: isMobileScreen ? '8px 16px' : '12px 14px',
+              borderRadius: '10px',
+              background: activeSection === 'controls' ? 'rgba(99, 102, 241, 0.08)' : 'transparent',
+              color: activeSection === 'controls' ? '#fff' : '#8f95a5',
+              border: 'none',
+              borderLeft: (!isMobileScreen && activeSection === 'controls') ? '3px solid var(--primary)' : '3px solid transparent',
+              borderBottom: (isMobileScreen && activeSection === 'controls') ? '3px solid var(--primary)' : '3px solid transparent',
+              cursor: 'pointer',
+              fontWeight: 600,
+              fontSize: '13px',
+              transition: 'all 0.2s',
+              flex: isMobileScreen ? 1 : 'none'
+            }}
+          >
+            <LayoutGrid size={16} />
+            {!isMobileScreen && 'Controls'}
+          </button>
 
-            {isEditMode && (
+          <button 
+            onClick={() => setActiveSection('performance')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: isMobileScreen ? 'center' : 'flex-start',
+              gap: '12px',
+              padding: isMobileScreen ? '8px 16px' : '12px 14px',
+              borderRadius: '10px',
+              background: activeSection === 'performance' ? 'rgba(99, 102, 241, 0.08)' : 'transparent',
+              color: activeSection === 'performance' ? '#fff' : '#8f95a5',
+              border: 'none',
+              borderLeft: (!isMobileScreen && activeSection === 'performance') ? '3px solid var(--primary)' : '3px solid transparent',
+              borderBottom: (isMobileScreen && activeSection === 'performance') ? '3px solid var(--primary)' : '3px solid transparent',
+              cursor: 'pointer',
+              fontWeight: 600,
+              fontSize: '13px',
+              transition: 'all 0.2s',
+              flex: isMobileScreen ? 1 : 'none'
+            }}
+          >
+            <Activity size={16} />
+            {!isMobileScreen && 'Performance'}
+          </button>
+
+          <button 
+            onClick={() => setActiveSection('settings')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: isMobileScreen ? 'center' : 'flex-start',
+              gap: '12px',
+              padding: isMobileScreen ? '8px 16px' : '12px 14px',
+              borderRadius: '10px',
+              background: activeSection === 'settings' ? 'rgba(99, 102, 241, 0.08)' : 'transparent',
+              color: activeSection === 'settings' ? '#fff' : '#8f95a5',
+              border: 'none',
+              borderLeft: (!isMobileScreen && activeSection === 'settings') ? '3px solid var(--primary)' : '3px solid transparent',
+              borderBottom: (isMobileScreen && activeSection === 'settings') ? '3px solid var(--primary)' : '3px solid transparent',
+              cursor: 'pointer',
+              fontWeight: 600,
+              fontSize: '13px',
+              transition: 'all 0.2s',
+              flex: isMobileScreen ? 1 : 'none'
+            }}
+          >
+            <Settings size={16} />
+            {!isMobileScreen && 'Settings'}
+          </button>
+        </nav>
+
+        {/* Sidebar Unpair Button */}
+        {!isMobileScreen && !isLocal && (
+          <button 
+            onClick={() => {
+              if (window.confirm('Are you sure you want to unpair from this PC?')) {
+                clearPairingToken();
+                localStorage.removeItem('webpcdeck_backend_ip');
+                setPcIpInput('');
+                setIsPaired(false);
+              }
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              padding: '10px 14px',
+              borderRadius: '8px',
+              border: '1px solid rgba(239, 68, 68, 0.15)',
+              background: 'rgba(239, 68, 68, 0.04)',
+              color: '#ef4444',
+              cursor: 'pointer',
+              fontWeight: 600,
+              fontSize: '12px',
+              transition: 'background var(--transition-fast)'
+            }}
+          >
+            <LogOut size={14} />
+            Unpair Device
+          </button>
+        )}
+      </aside>
+
+      {/* Content Pane */}
+      <div style={{ 
+        flex: 1, 
+        display: 'flex', 
+        flexDirection: 'column', 
+        padding: isMobileScreen ? '16px' : '24px 32px', 
+        paddingBottom: isMobileScreen ? '80px' : '24px', 
+        overflowY: 'auto' 
+      }}>
+        
+        {/* Top Header Bar */}
+        <header 
+          style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center', 
+            paddingBottom: '16px', 
+            marginBottom: '24px', 
+            borderBottom: '1px solid rgba(255, 255, 255, 0.05)' 
+          }}
+        >
+          {/* Connection Status */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div className={`pulse-dot ${isWsConnected ? '' : 'reconnecting'}`} style={{ width: '6px', height: '6px' }} />
+            <span style={{ fontSize: '12px', fontWeight: 600, color: isWsConnected ? '#e2e8f0' : 'var(--text-muted)' }}>
+              {isWsConnected ? 'Connected to PC' : 'Reconnecting...'}
+            </span>
+          </div>
+
+          {/* Run/Edit Mode Controls */}
+          <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+            {config && (
+              <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Profile: {config.profiles.find(p => p.id === config.activeProfileId)?.name}
+              </span>
+            )}
+            
+            <div className="toggle-switch-container">
               <button 
-                onClick={() => setIsProfileModalOpen(true)}
-                style={{ background: 'none', border: '1px dashed var(--border-color)', color: 'var(--text-secondary)', padding: '6px 10px', borderRadius: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                className={`toggle-switch-option ${!isEditMode ? 'active' : ''}`}
+                onClick={() => setIsEditMode(false)}
               >
-                <Plus size={14} /> New
+                <Play size={12} />
+                Run
               </button>
+              <button 
+                className={`toggle-switch-option ${isEditMode ? 'active' : ''}`}
+                onClick={() => setIsEditMode(true)}
+              >
+                <Settings size={12} />
+                Edit
+              </button>
+            </div>
+          </div>
+        </header>
+
+        {/* Controls Screen */}
+        {activeSection === 'controls' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '28px', flex: 1 }}>
+            
+
+
+            {/* Profiles switch tabs (Only in Edit mode) */}
+            {isEditMode && config && (
+              <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px', borderBottom: '1px solid rgba(255,255,255,0.03)', padding: '8px 0' }}>
+                {config.profiles.map(p => (
+                  <button
+                    key={p.id}
+                    onClick={async () => {
+                      const newCfg = { ...config, activeProfileId: p.id };
+                      setConfig(newCfg);
+                      await saveDeckConfig(newCfg);
+                    }}
+                    style={{
+                      background: config.activeProfileId === p.id ? '#181a1e' : 'rgba(255,255,255,0.02)',
+                      color: config.activeProfileId === p.id ? '#fff' : 'var(--text-secondary)',
+                      border: config.activeProfileId === p.id ? '1px solid rgba(99, 102, 241, 0.35)' : '1px solid rgba(255,255,255,0.05)',
+                      boxShadow: config.activeProfileId === p.id ? '0 0 12px -2px rgba(99, 102, 241, 0.2)' : 'none',
+                      padding: '6px 12px',
+                      borderRadius: '16px',
+                      cursor: 'pointer',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      transition: 'all var(--transition-fast)'
+                    }}
+                  >
+                    {p.name}
+                  </button>
+                ))}
+                <button 
+                  onClick={() => setIsProfileModalOpen(true)}
+                  style={{ background: 'none', border: '1px dashed var(--border-color)', color: 'var(--text-secondary)', padding: '4px 10px', borderRadius: '16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px' }}
+                >
+                  <Plus size={12} /> New
+                </button>
+              </div>
+            )}
+
+            {/* Main Button Grid */}
+            {activeProfile ? (
+              <main style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                <ButtonGrid
+                  profile={activeProfile}
+                  isEditMode={isEditMode}
+                  onExecute={handleExecuteAction}
+                  onConfigureButton={handleConfigureButton}
+                  onUpdateButtons={handleUpdateButtonsDirectly}
+                />
+              </main>
+            ) : (
+              <div style={{ textAlign: 'center', padding: '40px' }}>Loading configuration...</div>
+            )}
+          </div>
+        )}
+        {activeSection === 'performance' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', flex: 1 }}>
+            <h2 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '8px' }}>System Performance</h2>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px' }}>
+              
+              {/* CPU load widget */}
+              <div className="glass" style={{ padding: '24px', borderRadius: '16px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', gap: '24px' }}>
+                {/* CPU gauge circle SVG */}
+                <div style={{ position: 'relative', width: '90px', height: '90px' }}>
+                  <svg width="90" height="90" viewBox="0 0 36 36" style={{ transform: 'rotate(-90deg)' }}>
+                    <path
+                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                      fill="none"
+                      stroke="rgba(255,255,255,0.04)"
+                      strokeWidth="3.5"
+                    />
+                    <path
+                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                      fill="none"
+                      stroke="var(--primary)"
+                      strokeWidth="3.5"
+                      strokeDasharray={`${perfData ? perfData.cpu : 0}, 100`}
+                      style={{ transition: 'stroke-dasharray 0.5s ease-out' }}
+                    />
+                  </svg>
+                  <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                    <span style={{ fontSize: '18px', fontWeight: 800 }}>{perfData ? `${perfData.cpu}%` : '--'}</span>
+                  </div>
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '15px', fontWeight: 700, margin: '0 0 4px 0' }}>CPU Load</h3>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '12px', margin: 0 }}>
+                    Real-time host processor load utilization
+                  </p>
+                </div>
+              </div>
+
+              {/* Memory load widget */}
+              <div className="glass" style={{ padding: '24px', borderRadius: '16px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <h3 style={{ fontSize: '15px', fontWeight: 700, margin: '0 0 4px 0' }}>Memory Usage</h3>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '12px', margin: 0 }}>
+                      {perfData ? `${(perfData.usedMem / (1024 * 1024 * 1024)).toFixed(1)} GB / ${(perfData.totalMem / (1024 * 1024 * 1024)).toFixed(1)} GB` : '--'}
+                    </p>
+                  </div>
+                  <span style={{ fontSize: '18px', fontWeight: 800 }}>
+                    {perfData ? `${Math.round((perfData.usedMem / perfData.totalMem) * 100)}%` : '--'}
+                  </span>
+                </div>
+                
+                {/* memory bar indicator */}
+                <div style={{ width: '100%', height: '8px', background: 'rgba(255,255,255,0.04)', borderRadius: '4px', overflow: 'hidden' }}>
+                  <div 
+                    style={{ 
+                      height: '100%', 
+                      background: 'var(--primary)', 
+                      width: perfData ? `${(perfData.usedMem / perfData.totalMem) * 100}%` : '0%',
+                      borderRadius: '4px',
+                      transition: 'width 0.5s ease-out'
+                    }} 
+                  />
+                </div>
+              </div>
+
+              {/* CPU Temperature widget */}
+              <div className="glass" style={{ padding: '24px', borderRadius: '16px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', gap: '20px' }}>
+                <div style={{ fontSize: '32px' }}>🌡️</div>
+                <div>
+                  <h3 style={{ fontSize: '15px', fontWeight: 700, margin: '0 0 4px 0' }}>CPU Temp</h3>
+                  <span style={{ fontSize: '20px', fontWeight: 800, color: perfData?.cpuTemp && perfData.cpuTemp > 80 ? '#ef4444' : '#e2e8f0' }}>
+                    {perfData?.cpuTemp ? `${perfData.cpuTemp}°C` : 'N/A'}
+                  </span>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '11px', margin: '4px 0 0 0' }}>
+                    Thermal zone sensor monitoring
+                  </p>
+                </div>
+              </div>
+
+              {/* GPU Temperature widget */}
+              <div className="glass" style={{ padding: '24px', borderRadius: '16px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', gap: '20px' }}>
+                <div style={{ fontSize: '32px' }}>🎮</div>
+                <div>
+                  <h3 style={{ fontSize: '15px', fontWeight: 700, margin: '0 0 4px 0' }}>GPU Temp</h3>
+                  <span style={{ fontSize: '20px', fontWeight: 800, color: perfData?.gpuTemp && perfData.gpuTemp > 75 ? '#ef4444' : '#e2e8f0' }}>
+                    {perfData?.gpuTemp ? `${perfData.gpuTemp}°C` : 'N/A'}
+                  </span>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '11px', margin: '4px 0 0 0' }}>
+                    Graphics controller core temp
+                  </p>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        )}
+
+        {/* Settings Section */}
+        {activeSection === 'settings' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', flex: 1 }}>
+            <h2 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '8px' }}>Settings</h2>
+            
+            {/* Profile Manager */}
+            {config && (
+              <div className="glass" style={{ padding: '24px', borderRadius: '16px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <h3 style={{ fontSize: '14px', fontWeight: 700, marginBottom: '12px' }}>Profiles Management</h3>
+                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '16px' }}>
+                  {config.profiles.map(p => (
+                    <div 
+                      key={p.id} 
+                      style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '10px', 
+                        padding: '10px 14px', 
+                        borderRadius: '10px', 
+                        background: 'rgba(255,255,255,0.02)',
+                        border: '1px solid rgba(255,255,255,0.05)' 
+                      }}
+                    >
+                      <span style={{ fontSize: '13px', fontWeight: 600 }}>{p.name} ({p.rows}x{p.cols})</span>
+                      <button 
+                        onClick={() => handleDeleteProfileById(p.id)} 
+                        style={{ border: 'none', background: 'none', color: 'var(--danger)', cursor: 'pointer', padding: '2px' }}
+                        title="Delete Profile"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <button 
+                  onClick={() => setIsProfileModalOpen(true)}
+                  className="btn btn-secondary"
+                  style={{ fontSize: '12px', padding: '8px 16px', borderRadius: '8px' }}
+                >
+                  <Plus size={14} /> Add New Profile
+                </button>
+              </div>
+            )}
+
+            {/* Server Connection */}
+            {isLocal && serverState && (
+              <div className="glass" style={{ padding: '24px', borderRadius: '16px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <h3 style={{ fontSize: '14px', fontWeight: 700, marginBottom: '16px' }}>Host Server Connection</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
+                  <div>
+                    <span style={{ display: 'block', fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '6px' }}>ACTIVE PAIRING CODE</span>
+                    <span style={{ fontFamily: 'monospace', fontSize: '20px', fontWeight: 800, color: 'var(--primary)' }}>{serverState.pairingCode}</span>
+                  </div>
+                  <div>
+                    <span style={{ display: 'block', fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '6px' }}>MOBILE LAN IP URL</span>
+                    <code style={{ fontSize: '12px' }}>http://{serverState.lanIp}:{serverState.port}</code>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button className="btn btn-secondary" style={{ fontSize: '12px', padding: '8px 14px' }} onClick={handleExportConfig}>
+                    <Download size={14} /> Export Config
+                  </button>
+                  <label className="btn btn-secondary" style={{ fontSize: '12px', padding: '8px 14px', cursor: 'pointer' }}>
+                    <Upload size={14} /> Import Config
+                    <input 
+                      type="file" 
+                      accept=".json" 
+                      onChange={handleImportConfig} 
+                      style={{ display: 'none' }} 
+                    />
+                  </label>
+                </div>
+              </div>
             )}
           </div>
         )}
 
-        {/* Global actions (Toggle Edit mode, Connection detail) */}
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          {isEditMode && activeProfile && (
-            <button 
-              onClick={handleDeleteProfile} 
-              className="btn" 
-              style={{ background: 'none', border: 'none', color: 'var(--danger)', padding: '8px' }}
-              title="Delete Profile"
-            >
-              <Trash2 size={18} />
-            </button>
-          )}
-
-          {/* Two-state Layout Toggle Switch */}
-          <div className="toggle-switch-container">
-            <button 
-              className={`toggle-switch-option ${!isEditMode ? 'active' : ''}`}
-              onClick={() => setIsEditMode(false)}
-            >
-              <Play size={13} />
-              Run
-            </button>
-            <button 
-              className={`toggle-switch-option ${isEditMode ? 'active' : ''}`}
-              onClick={() => setIsEditMode(true)}
-            >
-              <Settings size={13} />
-              Edit
-            </button>
-          </div>
-
-          {!isLocal && (
-            <button 
-              onClick={() => {
-                if (window.confirm('Are you sure you want to unpair from this PC?')) {
-                  clearPairingToken();
-                  localStorage.removeItem('webpcdeck_backend_ip');
-                  setPcIpInput('');
-                  setIsPaired(false);
-                }
-              }}
-              className="btn btn-secondary"
-              style={{ padding: '8px', color: 'var(--danger)', borderRadius: '20px', background: 'rgba(239, 68, 68, 0.05)' }}
-              title="Unpair"
-            >
-              <LogOut size={15} />
-            </button>
-          )}
-        </div>
-      </header>
-
-      {/* Main Grid View */}
-      {activeProfile ? (
-        <main className="glass" style={{ padding: '24px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <ButtonGrid
-            profile={activeProfile}
-            isEditMode={isEditMode}
-            onExecute={handleExecuteAction}
-            onConfigureButton={handleConfigureButton}
-            onUpdateButtons={handleUpdateButtonsDirectly}
-          />
-        </main>
-      ) : (
-        <div style={{ textAlign: 'center', padding: '40px' }}>Loading configuration...</div>
-      )}
-
-      {/* Footer / Connection Panel (Only shown on Desktop host) */}
-      {isLocal && serverState && (
-        <footer 
-          className={`glass host-footer-drawer ${isFooterOpen ? 'open' : ''}`} 
-          style={{ 
-            marginTop: '24px', 
-            border: '1px solid var(--border-color)',
-            boxShadow: '0 10px 30px rgba(0,0,0,0.2)',
-            borderRadius: '16px',
-            background: 'rgba(20, 24, 33, 0.7)',
-            backdropFilter: 'blur(20px)',
-            display: 'flex',
-            flexDirection: 'column',
-          }}
-        >
-          {/* Drawer Header */}
-          <div 
-            onClick={() => setIsFooterOpen(!isFooterOpen)}
+        {/* Connection status drawer at bottom (PC/Electron run-mode view only) */}
+        {isLocal && serverState && activeSection !== 'settings' && (
+          <footer 
+            className={`glass host-footer-drawer ${isFooterOpen ? 'open' : ''}`} 
             style={{ 
-              padding: '14px 20px', 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center', 
-              cursor: 'pointer',
-              userSelect: 'none',
-              borderBottom: isFooterOpen ? '1px solid var(--border-color)' : 'none',
-              transition: 'border-bottom var(--transition-fast)'
+              marginTop: 'auto', 
+              border: '1px solid rgba(255, 255, 255, 0.05)',
+              boxShadow: '0 10px 30px rgba(0,0,0,0.2)',
+              borderRadius: '16px',
+              background: 'rgba(20, 24, 33, 0.7)',
+              backdropFilter: 'blur(20px)',
+              display: 'flex',
+              flexDirection: 'column',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Smartphone size={16} style={{ color: 'var(--primary)' }} />
-              <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>Host Server Status</span>
-              <div 
-                style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '5px', 
-                  background: 'rgba(34, 197, 94, 0.08)', 
-                  padding: '2px 8px', 
-                  borderRadius: '12px',
-                  border: '1px solid rgba(34, 197, 94, 0.15)'
-                }}
-              >
-                <div className="pulse-dot" style={{ width: '6px', height: '6px' }} />
-                <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--success)' }}>Running</span>
+            {/* Drawer Header */}
+            <div 
+              onClick={() => setIsFooterOpen(!isFooterOpen)}
+              style={{ 
+                padding: '12px 20px', 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center', 
+                cursor: 'pointer',
+                userSelect: 'none',
+                borderBottom: isFooterOpen ? '1px solid rgba(255, 255, 255, 0.05)' : 'none',
+                transition: 'border-bottom var(--transition-fast)'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Smartphone size={16} style={{ color: 'var(--primary)' }} />
+                <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>Host Server Status</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                  {serverState.connectedClients} Client{serverState.connectedClients !== 1 ? 's' : ''} Connected
+                </span>
+                <span style={{ transition: 'transform 0.3s', transform: isFooterOpen ? 'rotate(180deg)' : 'none', fontSize: '10px' }}>▼</span>
               </div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                {serverState.connectedClients} Client{serverState.connectedClients !== 1 ? 's' : ''} Connected
-              </span>
-              <span style={{ color: 'var(--text-secondary)', transition: 'transform 0.3s', transform: isFooterOpen ? 'rotate(180deg)' : 'none', fontSize: '10px' }}>▼</span>
-            </div>
-          </div>
 
-          {/* Drawer Content */}
-          <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-              {/* Left: Pairing Details */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Active Pairing Code</span>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            {/* Drawer Content */}
+            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                <div>
+                  <span style={{ display: 'block', fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '6px' }}>PAIRING CODE</span>
                   <span 
                     onClick={async () => {
                       try {
                         await navigator.clipboard.writeText(serverState.pairingCode);
                         setCopiedCode(true);
                         setTimeout(() => setCopiedCode(false), 2000);
-                      } catch (err) {}
+                      } catch {}
                     }}
                     style={{ 
                       fontFamily: 'monospace',
-                      fontSize: '22px',
+                      fontSize: '18px',
                       fontWeight: 800,
                       color: 'var(--primary)',
-                      background: 'rgba(99, 102, 241, 0.08)',
-                      border: '1px solid var(--primary-glow)',
-                      padding: '4px 14px',
-                      borderRadius: '8px',
                       cursor: 'pointer',
-                      letterSpacing: '2px',
-                      transition: 'all var(--transition-fast)',
+                      letterSpacing: '1px'
                     }}
-                    title="Click to copy"
                   >
                     {serverState.pairingCode}
                   </span>
-                  {copiedCode && <span style={{ fontSize: '11px', color: 'var(--success)', fontWeight: 600 }}>Copied ✓</span>}
+                  {copiedCode && <span style={{ fontSize: '11px', color: 'var(--success)', marginLeft: '8px' }}>Copied ✓</span>}
                 </div>
-                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Click to copy code to clipboard</span>
-              </div>
-
-              {/* Right: Network Details */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Direct Mobile Access</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <code style={{ fontSize: '13px', background: 'rgba(0,0,0,0.2)', padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--border-color)', color: '#fff' }}>
-                    http://{serverState.lanIp}:{serverState.port}
-                  </code>
+                <div>
+                  <span style={{ display: 'block', fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '6px' }}>LAN IP</span>
+                  <code style={{ fontSize: '12px' }}>http://{serverState.lanIp}:{serverState.port}</code>
                 </div>
-                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Open on your phone to connect over Wi-Fi</span>
               </div>
             </div>
+          </footer>
+        )}
 
-            {/* Clients Listing */}
-            {serverState.connectedClients > 0 && (
-              <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
-                <span style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px' }}>Connected Devices</span>
-                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                  {Array.from({ length: serverState.connectedClients }).map((_, idx) => (
-                    <div 
-                      key={idx} 
-                      style={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        gap: '8px', 
-                        background: 'rgba(255,255,255,0.02)', 
-                        border: '1px solid var(--border-color)', 
-                        padding: '8px 12px', 
-                        borderRadius: '10px' 
-                      }}
-                    >
-                      <Smartphone size={14} style={{ color: 'var(--text-secondary)' }} />
-                      <span style={{ fontSize: '12px', fontWeight: 600 }}>Remote Client #{idx + 1}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Import / Export Settings */}
-            {isEditMode && (
-              <div style={{ display: 'flex', gap: '10px', borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
-                <button className="btn btn-secondary" style={{ fontSize: '12px', padding: '8px 14px', borderRadius: '8px' }} onClick={handleExportConfig}>
-                  <Download size={14} /> Export Config
-                </button>
-                
-                <label className="btn btn-secondary" style={{ fontSize: '12px', padding: '8px 14px', borderRadius: '8px', cursor: 'pointer' }}>
-                  <Upload size={14} /> Import Config
-                  <input 
-                    type="file" 
-                    accept=".json" 
-                    onChange={handleImportConfig} 
-                    style={{ display: 'none' }} 
-                  />
-                </label>
-              </div>
-            )}
-          </div>
-        </footer>
-      )}
+      </div>
 
       {/* MODALS */}
       <EditModal

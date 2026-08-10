@@ -222,3 +222,20 @@ export class DeckSocket {
     }
   }
 }
+
+export interface PerformanceData {
+  cpu: number;
+  cpuTemp?: number | null;
+  gpuTemp?: number | null;
+  totalMem: number;
+  freeMem: number;
+  usedMem: number;
+}
+
+export async function getPerformanceMetrics(): Promise<PerformanceData> {
+  const res = await fetch(`${getBaseUrl()}/api/performance`, {
+    headers: getHeaders(),
+  });
+  if (!res.ok) throw new Error('Failed to get performance metrics');
+  return res.json();
+}

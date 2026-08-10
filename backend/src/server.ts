@@ -3,6 +3,7 @@ import http from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import cors from 'cors';
 import os from 'os';
+import { exec } from 'child_process';
 import url from 'url';
 import path from 'path';
 import fs from 'fs';
@@ -98,6 +99,85 @@ app.post('/api/config', authenticateRequest, (req: Request, res: Response) => {
   saveConfig(newConfig);
   broadcastToAll({ type: 'config_update', config: newConfig });
   res.json({ success: true });
+});
+
+// Calculate CPU load over a short interval
+function getCpuUsage(): Promise<number> {
+  const start = os.cpus();
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      const end = os.cpus();
+      let idleDifference = 0;
+      let totalDifference = 0;
+      for (let i = 0; i < start.length; i++) {
+        const s = start[i];
+        const e = end[i];
+        const sTotal = Object.values(s.times).reduce((a, b) => a + b, 0);
+        const eTotal = Object.values(e.times).reduce((a, b) => a + b, 0);
+        totalDifference += (eTotal - sTotal);
+        idleDifference += (e.times.idle - s.times.idle);
+      }
+      const usage = totalDifference > 0 ? (1 - idleDifference / totalDifference) * 100 : 0;
+      resolve(Math.round(usage));
+    }, 100);
+  });
+}
+
+function getCpuTemp(): Promise<number | null> {
+  return new Promise((resolve) => {
+    exec("powershell -Command \"(Get-Counter -Counter '\\Thermal Zone Information(*)\\Temperature' -ErrorAction SilentlyContinue).CounterSamples[0].CookedValue\"", (err, stdout) => {
+      if (err || !stdout.trim()) {
+        resolve(null);
+        return;
+      }
+      const kelvin = parseFloat(stdout.trim());
+      if (isNaN(kelvin)) {
+        resolve(null);
+      } else {
+        resolve(Math.round(kelvin - 273.15));
+      }
+    });
+  });
+}
+
+function getGpuTemp(): Promise<number | null> {
+  return new Promise((resolve) => {
+    exec("nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader,nounits", (err, stdout) => {
+      if (err || !stdout.trim()) {
+        resolve(null);
+        return;
+      }
+      const temp = parseInt(stdout.trim(), 10);
+      if (isNaN(temp)) {
+        resolve(null);
+      } else {
+        resolve(temp);
+      }
+    });
+  });
+}
+
+// System Performance Metrics REST endpoint
+app.get('/api/performance', authenticateRequest, async (req: Request, res: Response) => {
+  try {
+    const [cpuLoad, cpuTemp, gpuTemp] = await Promise.all([
+      getCpuUsage(),
+      getCpuTemp(),
+      getGpuTemp()
+    ]);
+    const totalMem = os.totalmem();
+    const freeMem = os.freemem();
+    res.json({
+      cpu: cpuLoad,
+      cpuTemp,
+      gpuTemp,
+      totalMem,
+      freeMem,
+      usedMem: totalMem - freeMem,
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to retrieve performance metrics' });
+  }
 });
 
 // Trigger action endpoint — no auth required (actions only run on the local machine)
