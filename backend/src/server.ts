@@ -46,7 +46,25 @@ let activeTunnelUrl: string | null = null;
 
 function startCloudflaredTunnel() {
   console.log('[Tunnel] Starting cloudflared quick tunnel...');
-  cloudflaredProcess = spawn('cloudflared', ['tunnel', '--url', `http://localhost:${PORT}`], {
+  
+  let binName = 'cloudflared';
+  const localPaths = [
+    path.join(process.cwd(), 'cloudflared.exe'),
+    path.join(process.cwd(), '..', 'cloudflared.exe'),
+    path.join(__dirname, '..', '..', 'cloudflared.exe'),
+    path.join(__dirname, '..', '..', '..', 'cloudflared.exe'),
+    path.join(__dirname, '..', '..', '..', '..', 'cloudflared.exe')
+  ];
+
+  for (const p of localPaths) {
+    if (fs.existsSync(p)) {
+      binName = p;
+      console.log(`[Tunnel] Found local cloudflared executable at: ${binName}`);
+      break;
+    }
+  }
+
+  cloudflaredProcess = spawn(binName, ['tunnel', '--url', `http://localhost:${PORT}`], {
     shell: true,
   });
 
