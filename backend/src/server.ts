@@ -44,8 +44,8 @@ const LAN_IP = getLanIp();
 function authenticateRequest(req: Request, res: Response, next: NextFunction) {
   const clientIp = req.socket.remoteAddress || req.ip;
 
-  // Auto-approve local requests
-  if (auth.isLocalAddress(clientIp)) {
+  // Auto-approve local requests (disabled on Vercel where proxying routes through localhost)
+  if (!process.env.VERCEL && auth.isLocalAddress(clientIp)) {
     return next();
   }
 
@@ -61,7 +61,7 @@ function authenticateRequest(req: Request, res: Response, next: NextFunction) {
 // REST Endpoints
 app.get('/api/state', (req: Request, res: Response) => {
   const clientIp = req.socket.remoteAddress || req.ip;
-  const isLocal = auth.isLocalAddress(clientIp);
+  const isLocal = !process.env.VERCEL && auth.isLocalAddress(clientIp);
 
   res.json({
     lanIp: LAN_IP,
