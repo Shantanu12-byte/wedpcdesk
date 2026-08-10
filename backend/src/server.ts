@@ -292,7 +292,7 @@ server.on('upgrade', (request, socket, head) => {
 });
 
 // WS Client management
-wss.on('connection', (ws: WebSocket, request) => {
+wss.on('connection', (ws: WebSocket, request: any) => {
   console.log('WS Client connected');
 
   // Immediately send initial state
@@ -312,7 +312,7 @@ wss.on('connection', (ws: WebSocket, request) => {
 // Broadcast helper
 function broadcastToAll(message: any) {
   const payload = JSON.stringify(message);
-  wss.clients.forEach((client) => {
+  wss.clients.forEach((client: WebSocket) => {
     if (client.readyState === WebSocket.OPEN) {
       client.send(payload);
     }
@@ -327,7 +327,7 @@ const frontendDistPath = fs.existsSync(path.join(__dirname, '..', '..', 'fronten
 app.use(express.static(frontendDistPath));
 
 // Fallback all non-API requests to React index.html
-app.get('*', (req, res, next) => {
+app.get('*', (req: Request, res: Response, next: NextFunction) => {
   if (req.path.startsWith('/api')) {
     return next();
   }
