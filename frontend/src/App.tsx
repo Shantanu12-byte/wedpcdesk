@@ -21,9 +21,7 @@ import {
   Plus, 
   Download, 
   Upload, 
-  Trash2, 
-  Wifi,
-  WifiOff
+  Trash2
 } from 'lucide-react';
 
 interface Toast {
@@ -51,8 +49,14 @@ const App: React.FC = () => {
     }
     return true;
   });
-  const [pairingCodeInput, setPairingCodeInput] = useState('');
+
   const [pcIpInput, setPcIpInput] = useState(localStorage.getItem('webpcdeck_backend_ip') || '');
+  
+  // Custom pairing input digits and state
+  const [codeDigits, setCodeDigits] = useState<string[]>(['', '', '', '', '', '']);
+  const [isPairingLoading, setIsPairingLoading] = useState(false);
+  const [hasValidationError, setHasValidationError] = useState(false);
+  const digitInputRefs = useRef<(HTMLInputElement | null)[]>([]);
   
   // Modals state
   const [activeCellCoord, setActiveCellCoord] = useState<string | null>(null);
@@ -66,6 +70,9 @@ const App: React.FC = () => {
   const [newProfileName, setNewProfileName] = useState('');
   const [newProfileRows, setNewProfileRows] = useState(3);
   const [newProfileCols, setNewProfileCols] = useState(5);
+
+  const [isFooterOpen, setIsFooterOpen] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
 
   const [toasts, setToasts] = useState<Toast[]>([]);
   const socketRef = useRef<DeckSocket | null>(null);
@@ -162,18 +169,44 @@ const App: React.FC = () => {
     };
   }, [isPaired]);
 
-  // Handle Pairing submission
-  const handlePairSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Handle Digit Key Event for Backspace navigation
+  const handleDigitKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace' && !codeDigits[index] && index > 0) {
+      digitInputRefs.current[index - 1]?.focus();
+    }
+  };
+
+  // Handle Digit Change
+  const handleDigitChange = (index: number, val: string) => {
+    const cleanVal = val.replace(/\D/g, '').slice(-1);
+    const newDigits = [...codeDigits];
+    newDigits[index] = cleanVal;
+    setCodeDigits(newDigits);
+
+    // Auto-advance focus to next box
+    if (cleanVal && index < 5) {
+      digitInputRefs.current[index + 1]?.focus();
+    }
+
+    // Auto-submit if completely filled
+    if (newDigits.every(d => d !== '') && newDigits.join('').length === 6) {
+      const code = newDigits.join('');
+      setTimeout(() => pairDirectly(code), 50);
+    }
+  };
+
+  // Unified direct pairing mechanism
+  const pairDirectly = async (code: string) => {
+    setIsPairingLoading(true);
+    setHasValidationError(false);
     try {
       if (!isLocal && pcIpInput.trim()) {
         localStorage.setItem('webpcdeck_backend_ip', pcIpInput.trim());
       }
-      const result = await pairWithCode(pairingCodeInput);
+      const result = await pairWithCode(code);
       if (result.success) {
         setIsPaired(true);
         showToast('Successfully paired!', 'success');
-        // Trigger config load
         const deckConfig = await getDeckConfig();
         setConfig(deckConfig);
       }
@@ -181,7 +214,20 @@ const App: React.FC = () => {
       if (!isLocal) {
         localStorage.removeItem('webpcdeck_backend_ip');
       }
+      setHasValidationError(true);
+      setTimeout(() => setHasValidationError(false), 500);
       showToast(err.message || 'Incorrect pairing code', 'error');
+    } finally {
+      setIsPairingLoading(false);
+    }
+  };
+
+  // Handle Pairing submission (fallback for form button)
+  const handlePairSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const code = codeDigits.join('');
+    if (code.length === 6) {
+      pairDirectly(code);
     }
   };
 
@@ -369,55 +415,98 @@ const App: React.FC = () => {
   // Render Pairing Interface on Mobile/Remote if not paired
   if (!isPaired) {
     return (
-      <div style={{ display: 'flex', minHeight: '100vh', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
-        <form onSubmit={handlePairSubmit} className="glass" style={{ width: '100%', maxWidth: '380px', padding: '32px', textAlign: 'center' }}>
-          <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎛️</div>
-          <h2 style={{ fontSize: '24px', fontWeight: 700, marginBottom: '8px' }}>Pair Remote Deck</h2>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '24px', lineHeight: '1.5' }}>
+      <div style={{ display: 'flex', minHeight: '100vh', alignItems: 'center', justifyContent: 'center', padding: '16px', position: 'relative', overflow: 'hidden' }}>
+        <div className="accent-bloom-glow" style={{ top: '30%', left: '50%', transform: 'translate(-50%, -50%)' }} />
+        
+        <form 
+          onSubmit={handlePairSubmit} 
+          className={`glass ${hasValidationError ? 'shake-error' : ''}`} 
+          style={{ 
+            width: '100%', 
+            maxWidth: '400px', 
+            padding: '40px 32px', 
+            textAlign: 'center',
+            boxShadow: '0 20px 50px rgba(0,0,0,0.4)',
+            transition: 'all 0.3s ease'
+          }}
+        >
+          <div style={{ fontSize: '56px', marginBottom: '20px', filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.2))' }}>🎛️</div>
+          <h2 style={{ fontSize: '24px', fontWeight: 800, marginBottom: '8px', letterSpacing: '-0.5px' }}>Pair Remote Deck</h2>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '13.5px', marginBottom: '28px', lineHeight: '1.6' }}>
             Enter the 6-digit pairing code shown on your laptop screen.
           </p>
 
           {!isLocal && (
-            <div style={{ marginBottom: '16px', textAlign: 'left' }}>
-              <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: 600 }}>PC IP Address</label>
+            <div style={{ marginBottom: '24px', textAlign: 'left' }}>
+              <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>PC IP / URL Address</label>
               <input
                 type="text"
-                placeholder="e.g. 192.168.1.7"
+                placeholder="e.g. rocket-suitably-modular.ngrok-free.dev"
                 value={pcIpInput}
                 onChange={(e) => setPcIpInput(e.target.value.trim())}
                 style={{ 
-                  textAlign: 'center', 
-                  fontSize: '16px', 
-                  padding: '10px',
+                  fontFamily: 'monospace',
+                  fontSize: '14px', 
+                  padding: '12px 14px',
                   width: '100%',
-                  marginBottom: '12px'
+                  borderRadius: '10px',
+                  background: 'rgba(0, 0, 0, 0.4)',
+                  border: '1px solid var(--border-color)',
+                  color: '#fff',
+                  transition: 'all var(--transition-fast)'
                 }}
                 required
               />
             </div>
           )}
 
-          <div style={{ marginBottom: '16px', textAlign: 'left' }}>
-            <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: 600 }}>Pairing Code</label>
-            <input
-              type="text"
-              placeholder="000000"
-              value={pairingCodeInput}
-              onChange={(e) => setPairingCodeInput(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              style={{ 
-                textAlign: 'center', 
-                fontSize: '32px', 
-                letterSpacing: '8px', 
-                fontWeight: 700, 
-                padding: '12px',
-                width: '100%'
-              }}
-              required
-            />
+          <div style={{ marginBottom: '28px', textAlign: 'left' }}>
+            <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Pairing Code</label>
+            <div className="code-digits-container">
+              {codeDigits.map((digit, idx) => (
+                <input
+                  key={idx}
+                  ref={el => digitInputRefs.current[idx] = el}
+                  type="text"
+                  pattern="\d*"
+                  inputMode="numeric"
+                  maxLength={1}
+                  value={digit}
+                  onChange={(e) => handleDigitChange(idx, e.target.value)}
+                  onKeyDown={(e) => handleDigitKeyDown(idx, e)}
+                  className="code-digit-input"
+                  style={{
+                    borderColor: hasValidationError ? 'var(--danger)' : undefined
+                  }}
+                />
+              ))}
+            </div>
           </div>
 
-          <button type="submit" className="btn btn-primary" style={{ width: '100%', fontSize: '16px', padding: '12px' }}>
-            Pair Device
+          <button 
+            type="submit" 
+            className="btn btn-primary" 
+            disabled={isPairingLoading || codeDigits.some(d => d === '')}
+            style={{ 
+              width: '100%', 
+              fontSize: '15px', 
+              padding: '14px', 
+              borderRadius: '10px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '10px',
+              boxShadow: '0 4px 20px rgba(99, 102, 241, 0.25)'
+            }}
+          >
+            {isPairingLoading ? (
+              <>
+                <div className="spinner" />
+                Pairing...
+              </>
+            ) : (
+              'Pair Device'
+            )}
           </button>
         </form>
 
@@ -441,11 +530,13 @@ const App: React.FC = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <span style={{ fontSize: '24px' }}>🎛️</span>
           <div>
-            <h1 style={{ fontSize: '18px', fontWeight: 700, letterSpacing: '-0.5px' }}>WebPCDeck</h1>
-            <span style={{ fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px', color: isWsConnected ? 'var(--success)' : 'var(--text-muted)' }}>
-              {isWsConnected ? <Wifi size={12} /> : <WifiOff size={12} />}
-              {isWsConnected ? 'Connected to Host' : 'Reconnecting...'}
-            </span>
+            <h1 style={{ fontSize: '16px', fontWeight: 800, letterSpacing: '-0.5px' }}>WebPCDeck</h1>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+              <div className={`pulse-dot ${isWsConnected ? '' : 'reconnecting'}`} />
+              <span style={{ fontSize: '11px', fontWeight: 600, color: isWsConnected ? 'var(--text-secondary)' : 'var(--text-muted)' }}>
+                {isWsConnected ? 'Connected' : 'Reconnecting...'}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -488,7 +579,7 @@ const App: React.FC = () => {
         )}
 
         {/* Global actions (Toggle Edit mode, Connection detail) */}
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
           {isEditMode && activeProfile && (
             <button 
               onClick={handleDeleteProfile} 
@@ -500,28 +591,39 @@ const App: React.FC = () => {
             </button>
           )}
 
-          <button 
-            className={`btn ${isEditMode ? 'btn-primary pulse-primary' : 'btn-secondary'}`}
-            onClick={() => setIsEditMode(!isEditMode)}
-            style={{ fontSize: '13px' }}
-          >
-            {isEditMode ? <Play size={15} /> : <Settings size={15} />}
-            {isEditMode ? 'Run Mode' : 'Edit Layout'}
-          </button>
+          {/* Two-state Layout Toggle Switch */}
+          <div className="toggle-switch-container">
+            <button 
+              className={`toggle-switch-option ${!isEditMode ? 'active' : ''}`}
+              onClick={() => setIsEditMode(false)}
+            >
+              <Play size={13} />
+              Run
+            </button>
+            <button 
+              className={`toggle-switch-option ${isEditMode ? 'active' : ''}`}
+              onClick={() => setIsEditMode(true)}
+            >
+              <Settings size={13} />
+              Edit
+            </button>
+          </div>
 
           {!isLocal && (
             <button 
               onClick={() => {
-                clearPairingToken();
-                localStorage.removeItem('webpcdeck_backend_ip');
-                setPcIpInput('');
-                setIsPaired(false);
+                if (window.confirm('Are you sure you want to unpair from this PC?')) {
+                  clearPairingToken();
+                  localStorage.removeItem('webpcdeck_backend_ip');
+                  setPcIpInput('');
+                  setIsPaired(false);
+                }
               }}
               className="btn btn-secondary"
-              style={{ padding: '8px', color: 'var(--danger)' }}
+              style={{ padding: '8px', color: 'var(--danger)', borderRadius: '20px', background: 'rgba(239, 68, 68, 0.05)' }}
               title="Unpair"
             >
-              <LogOut size={16} />
+              <LogOut size={15} />
             </button>
           )}
         </div>
@@ -544,50 +646,153 @@ const App: React.FC = () => {
 
       {/* Footer / Connection Panel (Only shown on Desktop host) */}
       {isLocal && serverState && (
-        <footer className="glass" style={{ marginTop: '24px', padding: '12px 20px', display: 'flex', flexWrap: 'wrap', gap: '16px', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-secondary)' }}>
-              <Smartphone size={14} />
-              <span>Mobile access:</span>
-              <strong style={{ color: 'var(--primary)' }}>http://{serverState.lanIp}:{serverState.port}</strong>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-secondary)' }}>
-              <span>Pairing Code:</span>
-              <span 
+        <footer 
+          className={`glass host-footer-drawer ${isFooterOpen ? 'open' : ''}`} 
+          style={{ 
+            marginTop: '24px', 
+            border: '1px solid var(--border-color)',
+            boxShadow: '0 10px 30px rgba(0,0,0,0.2)',
+            borderRadius: '16px',
+            background: 'rgba(20, 24, 33, 0.7)',
+            backdropFilter: 'blur(20px)',
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          {/* Drawer Header */}
+          <div 
+            onClick={() => setIsFooterOpen(!isFooterOpen)}
+            style={{ 
+              padding: '14px 20px', 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center', 
+              cursor: 'pointer',
+              userSelect: 'none',
+              borderBottom: isFooterOpen ? '1px solid var(--border-color)' : 'none',
+              transition: 'border-bottom var(--transition-fast)'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Smartphone size={16} style={{ color: 'var(--primary)' }} />
+              <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>Host Server Status</span>
+              <div 
                 style={{ 
-                  backgroundColor: 'rgba(99, 102, 241, 0.1)', 
-                  border: '1px solid var(--primary-glow)', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '5px', 
+                  background: 'rgba(34, 197, 94, 0.08)', 
                   padding: '2px 8px', 
-                  borderRadius: '4px', 
-                  fontWeight: 700, 
-                  color: 'var(--primary)',
-                  letterSpacing: '1px'
+                  borderRadius: '12px',
+                  border: '1px solid rgba(34, 197, 94, 0.15)'
                 }}
               >
-                {serverState.pairingCode}
+                <div className="pulse-dot" style={{ width: '6px', height: '6px' }} />
+                <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--success)' }}>Running</span>
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                {serverState.connectedClients} Client{serverState.connectedClients !== 1 ? 's' : ''} Connected
               </span>
+              <span style={{ color: 'var(--text-secondary)', transition: 'transform 0.3s', transform: isFooterOpen ? 'rotate(180deg)' : 'none', fontSize: '10px' }}>▼</span>
             </div>
           </div>
 
-          {/* Import / Export Settings */}
-          {isEditMode && (
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button className="btn btn-secondary" style={{ fontSize: '12px', padding: '6px 12px' }} onClick={handleExportConfig}>
-                <Download size={14} /> Export Config
-              </button>
-              
-              <label className="btn btn-secondary" style={{ fontSize: '12px', padding: '6px 12px', cursor: 'pointer' }}>
-                <Upload size={14} /> Import Config
-                <input 
-                  type="file" 
-                  accept=".json" 
-                  onChange={handleImportConfig} 
-                  style={{ display: 'none' }} 
-                />
-              </label>
+          {/* Drawer Content */}
+          <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+              {/* Left: Pairing Details */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Active Pairing Code</span>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <span 
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(serverState.pairingCode);
+                        setCopiedCode(true);
+                        setTimeout(() => setCopiedCode(false), 2000);
+                      } catch (err) {}
+                    }}
+                    style={{ 
+                      fontFamily: 'monospace',
+                      fontSize: '22px',
+                      fontWeight: 800,
+                      color: 'var(--primary)',
+                      background: 'rgba(99, 102, 241, 0.08)',
+                      border: '1px solid var(--primary-glow)',
+                      padding: '4px 14px',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      letterSpacing: '2px',
+                      transition: 'all var(--transition-fast)',
+                    }}
+                    title="Click to copy"
+                  >
+                    {serverState.pairingCode}
+                  </span>
+                  {copiedCode && <span style={{ fontSize: '11px', color: 'var(--success)', fontWeight: 600 }}>Copied ✓</span>}
+                </div>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Click to copy code to clipboard</span>
+              </div>
+
+              {/* Right: Network Details */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Direct Mobile Access</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <code style={{ fontSize: '13px', background: 'rgba(0,0,0,0.2)', padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--border-color)', color: '#fff' }}>
+                    http://{serverState.lanIp}:{serverState.port}
+                  </code>
+                </div>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Open on your phone to connect over Wi-Fi</span>
+              </div>
             </div>
-          )}
+
+            {/* Clients Listing */}
+            {serverState.connectedClients > 0 && (
+              <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
+                <span style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px' }}>Connected Devices</span>
+                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                  {Array.from({ length: serverState.connectedClients }).map((_, idx) => (
+                    <div 
+                      key={idx} 
+                      style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '8px', 
+                        background: 'rgba(255,255,255,0.02)', 
+                        border: '1px solid var(--border-color)', 
+                        padding: '8px 12px', 
+                        borderRadius: '10px' 
+                      }}
+                    >
+                      <Smartphone size={14} style={{ color: 'var(--text-secondary)' }} />
+                      <span style={{ fontSize: '12px', fontWeight: 600 }}>Remote Client #{idx + 1}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Import / Export Settings */}
+            {isEditMode && (
+              <div style={{ display: 'flex', gap: '10px', borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
+                <button className="btn btn-secondary" style={{ fontSize: '12px', padding: '8px 14px', borderRadius: '8px' }} onClick={handleExportConfig}>
+                  <Download size={14} /> Export Config
+                </button>
+                
+                <label className="btn btn-secondary" style={{ fontSize: '12px', padding: '8px 14px', borderRadius: '8px', cursor: 'pointer' }}>
+                  <Upload size={14} /> Import Config
+                  <input 
+                    type="file" 
+                    accept=".json" 
+                    onChange={handleImportConfig} 
+                    style={{ display: 'none' }} 
+                  />
+                </label>
+              </div>
+            )}
+          </div>
         </footer>
       )}
 

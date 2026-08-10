@@ -29,9 +29,15 @@ const PRESET_APPS = [
   },
   {
     name: 'Spotify',
-    icon: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIiBmaWxsPSIjRkZGIj48Y2lyY2xlIGN4PSIyNTYiIGN5PSIyNTYiIHI9IjI1NiIgZmlsbD0iIzFEQjg1NCIvPjxwYXRoIGQ9Ik0zODIgMzU1Yy02IDgtMTYgMTAtMjQgNS01My0zMi0xMTktMzktMTk4LTIxLTkgMy0xOS00LTIxLTEzczMtMTkgMTMtMjFjODctMjAgMTYxLTEyIDIyMSAyNCA5IDUgMTEgMTYgNiAyNHptMzEtNjZjLTggMTItMjQgMTYtMzYgOC02MS0zOC0xNTQtNDktMjI2LTI3LTE0IDQtMjktNC0zMy0xNy00LTE0IDQtMjkgMTctMzMgODItMjUgMTg1LTEyIDI1NCAzMCAxMiA4IDE2IDI0IDggMzZ6bTMtNzBjLTczLTQ0LTE5NS00OC0yNjYtMjYtMTEgMy0yMy0zLTI2LTE1LTMtMTEgMy0yMyAxNS0yNiA4Mi0yNSAyMTctMjAgMzAxIDMwIDEwIDYgMTMgMjAgNyAzMC02IDExLTIwIDE0LTMxIDd6Ii8+PC9zdmc=',
+    icon: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIiBmaWxsPSIjRkZGIj48Y2lyY2xlIGN4PSIyNTYiIGN5PSIyNTYiIHI9IjI1NiIgZmlsbD0iIzFEQjg1NCIvPjxwYXRoIGQ9Ik0zODIgMzU1Yy-2IDgtMTYgMTAtMjQgNS01My0zMi0xMTktMzktMTk4LTIxLTkgMy0xOS00LTIxLTEzczMtMTkgMTMtMjFjODctMjAgMTYxLTEyIDIyMSAyNCA5IDUgMTEgMTYgNiAyNHptMzEtNjZjLTggMTItMjQgMTYtMzYgOC02MS0zOC0xNTQtNDktMjI2LTI3LTE0IDQtMjktNC0zMy0xNy00LTE0IDQtMjkgMTctMzMgODItMjUgMTg1LTEyIDI1NCAzMCAxMiA4IDE2IDI0IDggMzZ6bTMtNzBjLTczLTQ0LTE5NS00OC0yNjYtMjYtMTEgMy0yMy0zLTI2LTE1LTMtMTEgMy0yMyAxNS0yNiA4Mi0yNSAyMTctMjAgMzAxIDMwIDEwIDYgMTMgMjAgNyAzMC02IDExLTIwIDE0LTMxIDd6Ii8+PC9zdmc+',
     color: '#1db954',
     path: 'C:\\Users\\shant\\AppData\\Roaming\\Spotify\\Spotify.exe',
+  },
+  {
+    name: 'Edge',
+    icon: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIiBmaWxsPSIjMDA3OEQ3Ij48cGF0aCBkPSJNMjU2IDBjMTQxLjQgMCAyNTYgMTE0LjYgMjU2IDI1NnMtMTE0LjYgMjU2LTI1NiAyNTZTMCAzOTcuNCAwIDI1NiAxMTQuNiAwIDI1NiAwem0tMS44IDEyOC40Yy0zNSAwLTY2IDIzLjQtNzguNiA1Ny42LTQuNiAxMi42LTIgMjYuNiA2LjggMzYuNCAxMi42IDE0IDMzLjIgMTYuNiA0OC42IDZsNTktNDAuNGMxNy4yLTExLjggNDAtMTAuMiA1NS40IDMuOEwzODIgMjI1YzE1LjIgMTMuOCAxNy42IDM2LjQgNS42IDUyLjhsLTU0LjggNzQuOGMtMTIgMTYuNC0zMi40IDIzLjgtNTIuMiAxOC44bC04MC0yMC4yYy0xNS42LTQtMjUuMi0yMC0yMS4yLTM1LjZzMjAtMjUuMiAzNS42LTIxLjJsNjIuMiAxNS42IDI2LjYtMzYuNC00NC42LTI4LjZjLTE3LjItMTEtMzkuNi05LTU0LjYgNC44bC00MCAzN2MtMTIgMTEtMzAgMTEtNDIgMGwtMTctMTUuNmMtMTEuOC0xMS0xMy0yOS0uMi00MS4ybDU2LjgtNTQuNmMxNi0xNS40IDM5LjQtMjAgNjAuMi0xMmw3NC42IDI4LjZjMjAuNCA3LjggNDMuNi0uOCA1NC0xOS44czctNDIuNi05LjgtNTUuMkwzMTIgMTM5LjhjLTE3LTExLjQtMzguNi0xMy42LTU3LjgtMTEuNHoiLz48L3N2Zz4=',
+    color: '#0078d7',
+    path: 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
   },
   {
     name: 'Valorant',
@@ -52,6 +58,7 @@ const EditModal: React.FC<EditModalProps> = ({
   const [icon, setIcon] = useState('🔘');
   const [color, setColor] = useState('#4f46e5');
   const [confirmBeforeRun, setConfirmBeforeRun] = useState(false);
+  const [appliedPreset, setAppliedPreset] = useState<string | null>(null);
   
   // Action state
   const [actionType, setActionType] = useState<ActionType>('launch');
@@ -250,23 +257,34 @@ const EditModal: React.FC<EditModalProps> = ({
                     setColor(app.color);
                     setActionType('launch');
                     setLaunchPath(app.path);
+                    
+                    // Show micro-confirmation checkmark
+                    setAppliedPreset(app.name);
+                    setTimeout(() => setAppliedPreset(null), 1500);
                   }}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
                     gap: '6px',
-                    background: 'rgba(255, 255, 255, 0.05)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    background: appliedPreset === app.name ? 'rgba(34, 197, 94, 0.1)' : 'rgba(255, 255, 255, 0.05)',
+                    border: appliedPreset === app.name ? '1px solid rgba(34, 197, 94, 0.3)' : '1px solid rgba(255, 255, 255, 0.1)',
                     borderRadius: '8px',
                     padding: '6px 12px',
-                    color: 'var(--text-primary)',
+                    color: appliedPreset === app.name ? 'var(--success)' : 'var(--text-primary)',
                     cursor: 'pointer',
                     fontSize: '12px',
                     fontWeight: 600,
+                    transition: 'all var(--transition-fast)'
                   }}
                 >
-                  <img src={app.icon} alt={app.name} style={{ width: '16px', height: '16px', objectFit: 'contain' }} />
-                  {app.name}
+                  {appliedPreset === app.name ? (
+                    <span>✓ Applied</span>
+                  ) : (
+                    <>
+                      <img src={app.icon} alt={app.name} style={{ width: '16px', height: '16px', objectFit: 'contain' }} />
+                      {app.name}
+                    </>
+                  )}
                 </button>
               ))}
             </div>

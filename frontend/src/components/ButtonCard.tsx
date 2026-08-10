@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ButtonConfig } from '../../../shared/types';
 import { Plus } from 'lucide-react';
 
@@ -23,6 +23,10 @@ const ButtonCard: React.FC<ButtonCardProps> = ({
   onDragOver,
   onDrop,
 }) => {
+  const [isHovered, setIsHovered] = useState(false);
+  const [isPressed, setIsPressed] = useState(false);
+  const [isSlotHovered, setIsSlotHovered] = useState(false);
+
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     console.log(`ButtonCard clicked: coord=${coordinate}, label=${button?.label}, isEditMode=${isEditMode}`);
@@ -57,20 +61,23 @@ const ButtonCard: React.FC<ButtonCardProps> = ({
         onClick={handleClick}
         onDragOver={handleDragOverLocal}
         onDrop={handleDropLocal}
-        className="glass-interactive"
+        onMouseEnter={() => setIsSlotHovered(true)}
+        onMouseLeave={() => setIsSlotHovered(false)}
         style={{
           aspectRatio: '1',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          border: '2px dashed var(--border-color)',
+          border: isSlotHovered && isEditMode ? '2px dashed var(--primary)' : '2px dashed var(--border-color)',
           borderRadius: '16px',
           cursor: isEditMode ? 'pointer' : 'default',
-          color: 'var(--text-muted)',
-          backgroundColor: 'rgba(0, 0, 0, 0.1)',
+          color: isSlotHovered && isEditMode ? 'var(--primary)' : 'var(--text-muted)',
+          backgroundColor: isSlotHovered && isEditMode ? 'rgba(99, 102, 241, 0.04)' : 'rgba(0, 0, 0, 0.15)',
+          transition: 'all var(--transition-fast)',
+          transform: isSlotHovered && isEditMode ? 'scale(1.02)' : 'none',
         }}
       >
-        {isEditMode && <Plus size={24} style={{ opacity: 0.5 }} />}
+        {isEditMode && <Plus size={24} style={{ opacity: isSlotHovered ? 0.8 : 0.4, transition: 'opacity 0.2s' }} />}
       </div>
     );
   }
@@ -85,66 +92,60 @@ const ButtonCard: React.FC<ButtonCardProps> = ({
       onDragOver={handleDragOverLocal}
       onDrop={handleDropLocal}
       onClick={handleClick}
-      className="glass-interactive"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => {
+        setIsHovered(false);
+        setIsPressed(false);
+      }}
+      onMouseDown={() => setIsPressed(true)}
+      onMouseUp={() => setIsPressed(false)}
+      onTouchStart={() => setIsPressed(true)}
+      onTouchEnd={() => setIsPressed(false)}
       style={{
         aspectRatio: '1',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: '6px',
+        gap: '8px',
         padding: '12px',
         borderRadius: '16px',
         cursor: 'pointer',
         backgroundColor: button.color,
-        border: '1px solid rgba(255, 255, 255, 0.15)',
-        boxShadow: `0 4px 14px ${button.color}25`,
+        border: isHovered ? '1px solid rgba(255, 255, 255, 0.3)' : '1px solid rgba(255, 255, 255, 0.15)',
+        boxShadow: isHovered 
+          ? `0 12px 28px ${button.color}50` 
+          : `0 4px 14px ${button.color}25`,
         textAlign: 'center',
         userSelect: 'none',
         position: 'relative',
-        transform: 'translateZ(0)',
-        transition: 'transform 0.1s ease, box-shadow 0.2s ease, filter 0.2s ease',
-      }}
-      onMouseDown={(e) => {
-        if (!isEditMode) {
-          e.currentTarget.style.transform = 'scale(0.96)';
-          e.currentTarget.style.filter = 'brightness(0.9)';
-        }
-      }}
-      onMouseUp={(e) => {
-        if (!isEditMode) {
-          e.currentTarget.style.transform = 'none';
-          e.currentTarget.style.filter = 'none';
-        }
-      }}
-      onMouseLeave={(e) => {
-        if (!isEditMode) {
-          e.currentTarget.style.transform = 'none';
-          e.currentTarget.style.filter = 'none';
-        }
+        transform: isPressed ? 'scale(0.95)' : isHovered ? 'scale(1.03)' : 'scale(1)',
+        filter: isPressed ? 'brightness(0.85)' : 'none',
+        transition: 'transform 0.12s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.2s ease, border-color 0.2s ease, filter 0.1s ease',
       }}
     >
       {button.icon && (button.icon.startsWith('http') || button.icon.startsWith('/') || button.icon.startsWith('data:image')) ? (
         <img 
           src={button.icon} 
           alt={button.label} 
-          style={{ width: '40px', height: '40px', objectFit: 'contain', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.15))' }} 
+          style={{ width: '42px', height: '42px', objectFit: 'contain', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.15))', transform: isHovered ? 'scale(1.05)' : 'none', transition: 'transform 0.2s ease' }} 
         />
       ) : (
-        <span style={{ fontSize: '32px', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.15))' }}>
+        <span style={{ fontSize: '32px', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.15))', transform: isHovered ? 'scale(1.05)' : 'none', transition: 'transform 0.2s ease', display: 'inline-block' }}>
           {button.icon}
         </span>
       )}
       <span
         style={{
-          fontSize: '12px',
-          fontWeight: 600,
+          fontSize: '11px',
+          fontWeight: 700,
           color: textColor,
           width: '100%',
           overflow: 'hidden',
           textOverflow: 'ellipsis',
           whiteSpace: 'nowrap',
-          textShadow: '0 1px 2px rgba(0,0,0,0.4)',
+          textShadow: '0 1px 3px rgba(0,0,0,0.6)',
+          opacity: 0.95,
         }}
       >
         {button.label}
