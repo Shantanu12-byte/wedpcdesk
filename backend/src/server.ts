@@ -9,7 +9,7 @@ import fs from 'fs';
 import { auth } from './auth';
 import { loadConfig, saveConfig } from './config';
 import { WindowsActionExecutor } from './actions/windows';
-import { ActionConfig, DeckConfig } from '../../shared/types';
+import { ActionConfig, DeckConfig } from '../../../shared/types';
 
 const app = express();
 app.use(cors());

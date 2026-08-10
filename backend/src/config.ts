@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import { DeckConfig, Profile } from '../../shared/types';
+import { DeckConfig, Profile } from '../../../shared/types';
 
 let CONFIG_DIR = process.env.VERCEL
   ? path.join(os.tmpdir(), 'webpcdeck')

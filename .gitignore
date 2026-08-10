@@ -35,3 +35,6 @@ Thumbs.db
 # Local test configurations
 tokens.json
 config.json
+
+.vercel
+.env*.local

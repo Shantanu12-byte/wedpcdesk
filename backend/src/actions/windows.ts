@@ -1,6 +1,6 @@
 import { exec, spawn } from 'child_process';
 import { ActionExecutor } from './index';
-import { ActionConfig } from '../../../shared/types';
+import { ActionConfig } from '../../../../shared/types';
 import path from 'path';
 import os from 'os';
 import fs from 'fs';
