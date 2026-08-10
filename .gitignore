@@ -1,0 +1,37 @@
+# Node / Build Dependencies
+node_modules/
+dist/
+build/
+.cache/
+.parcel-cache/
+.eslintcache
+
+# Production build outputs
+frontend/dist/
+backend/dist/
+
+# OS/System files
+.DS_Store
+Thumbs.db
+*.log
+
+# Environment/Secret files
+.env
+.env.*
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE/Editor config
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Local test configurations
+tokens.json
+config.json
