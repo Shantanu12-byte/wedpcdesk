@@ -95,7 +95,7 @@ function findNgrok(): string | null {
     path.join(__dirname, '..', '..', 'ngrok.exe'),
     path.join(__dirname, '..', '..', '..', 'ngrok.exe'),
     path.join(__dirname, '..', '..', '..', '..', 'ngrok.exe'),
-    path.join(__dirname, '..', '..', '..', '..', 'app.asar.unpacked', 'ngrok.exe'),
+    path.join(__dirname, '..', '..', '..', '..', '..', 'app.asar.unpacked', 'ngrok.exe'),
     path.join(path.dirname(process.execPath), 'resources', 'app.asar.unpacked', 'ngrok.exe'),
     path.join(path.dirname(process.execPath), 'ngrok.exe'),
     'ngrok', // fallback: system PATH
@@ -104,9 +104,16 @@ function findNgrok(): string | null {
   logDebug(`[Tunnel] Searching for ngrok.exe...`);
   for (const p of candidates) {
     if (p === 'ngrok') continue; // skip PATH check in loop
-    const exists = fs.existsSync(p);
-    logDebug(`[Tunnel] Checking: ${p} (exists: ${exists})`);
-    if (exists) return p;
+    
+    // If path is inside app.asar, it must be run from app.asar.unpacked
+    let targetPath = p;
+    if (p.includes('app.asar') && !p.includes('app.asar.unpacked')) {
+      targetPath = p.replace('app.asar', 'app.asar.unpacked');
+    }
+
+    const exists = fs.existsSync(targetPath);
+    logDebug(`[Tunnel] Checking: ${targetPath} (exists: ${exists})`);
+    if (exists) return targetPath;
   }
   // Try system PATH as last resort
   return 'ngrok';
