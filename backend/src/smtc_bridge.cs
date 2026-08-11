@@ -9,6 +9,9 @@ class SmtcBridge
 {
     private static object manager = null;
     private static object currentSession = null;
+    
+    private static string lastTrackKey = "";
+    private static string cachedBase64Thumbnail = "";
 
     // Reflection cached types and methods
     private static Type managerType;
@@ -246,43 +249,59 @@ class SmtcBridge
             // 3. Get Thumbnail/Album Art
             step = "3. Thumbnail";
             string base64Thumbnail = "";
-            object thumbnailRef = mediaPropsType.GetProperty("Thumbnail").GetValue(props);
-            if (thumbnailRef != null)
+            string trackKey = title + " - " + artist + " - " + album;
+
+            if (trackKey != lastTrackKey)
             {
-                try
+                object thumbnailRef = mediaPropsType.GetProperty("Thumbnail").GetValue(props);
+                if (thumbnailRef != null)
                 {
-                    var openReadMethod = streamReferenceType.GetMethod("OpenReadAsync", new Type[0]);
-                    var streamOp = openReadMethod.Invoke(thumbnailRef, null);
-                    Type streamType = Type.GetType("Windows.Storage.Streams.IRandomAccessStreamWithContentType, Windows, ContentType=WindowsRuntime");
-                    object stream = AwaitOperation(streamOp, streamType);
-
-                    ulong size = (ulong)randomAccessStreamType.GetProperty("Size").GetValue(stream);
-                    var contentTypeProp = streamType.GetProperty("ContentType");
-                    string contentType = contentTypeProp != null ? (string)contentTypeProp.GetValue(stream) : "unknown";
-                    
-                    Console.WriteLine("{\"log\": \"Thumbnail fetched: size=" + size + " bytes, type=" + contentType + "\"}");
-                    if (size > 0)
+                    try
                     {
-                        var dataReader = Activator.CreateInstance(dataReaderType, new object[] { stream });
-                        var loadOp = dataReaderType.GetMethod("LoadAsync").Invoke(dataReader, new object[] { (uint)size });
-                        AwaitOperation(loadOp, typeof(uint));
+                        var openReadMethod = streamReferenceType.GetMethod("OpenReadAsync", new Type[0]);
+                        var streamOp = openReadMethod.Invoke(thumbnailRef, null);
+                        Type streamType = Type.GetType("Windows.Storage.Streams.IRandomAccessStreamWithContentType, Windows, ContentType=WindowsRuntime");
+                        object stream = AwaitOperation(streamOp, streamType);
 
-                        byte[] buffer = new byte[size];
-                        var readBytesMethod = dataReaderType.GetMethod("ReadBytes");
-                        readBytesMethod.Invoke(dataReader, new object[] { buffer });
+                        ulong size = (ulong)randomAccessStreamType.GetProperty("Size").GetValue(stream);
+                        var contentTypeProp = streamType.GetProperty("ContentType");
+                        string contentType = contentTypeProp != null ? (string)contentTypeProp.GetValue(stream) : "unknown";
+                        
+                        Console.WriteLine("{\"log\": \"Thumbnail fetched: size=" + size + " bytes, type=" + contentType + "\"}");
+                        if (size > 0)
+                        {
+                            var dataReader = Activator.CreateInstance(dataReaderType, new object[] { stream });
+                            var loadOp = dataReaderType.GetMethod("LoadAsync").Invoke(dataReader, new object[] { (uint)size });
+                            AwaitOperation(loadOp, typeof(uint));
 
-                        base64Thumbnail = Convert.ToBase64String(buffer);
+                            byte[] buffer = new byte[size];
+                            var readBytesMethod = dataReaderType.GetMethod("ReadBytes");
+                            readBytesMethod.Invoke(dataReader, new object[] { buffer });
 
-                        // Dispose stream and reader
-                        try { ((IDisposable)stream).Dispose(); } catch { }
-                        try { ((IDisposable)dataReader).Dispose(); } catch { }
+                            cachedBase64Thumbnail = Convert.ToBase64String(buffer);
+
+                            try { ((IDisposable)stream).Dispose(); } catch { }
+                            try { ((IDisposable)dataReader).Dispose(); } catch { }
+                        }
+                        else
+                        {
+                            cachedBase64Thumbnail = "";
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine("{\"log\": \"Thumbnail error: " + JsonEscape(ex.ToString()) + "\"}");
+                        cachedBase64Thumbnail = "";
                     }
                 }
-                catch (Exception ex)
+                else
                 {
-                    Console.WriteLine("{\"log\": \"Thumbnail error: " + JsonEscape(ex.ToString()) + "\"}");
+                    cachedBase64Thumbnail = "";
                 }
+                lastTrackKey = trackKey;
             }
+
+            base64Thumbnail = cachedBase64Thumbnail;
 
             // 4. Get Playback Info
             var getPlaybackInfoMethod = sessionType.GetMethod("GetPlaybackInfo");
