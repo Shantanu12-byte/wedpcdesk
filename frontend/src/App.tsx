@@ -798,61 +798,63 @@ const App: React.FC = () => {
 
         {/* Controls Screen */}
         {activeSection === 'controls' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '28px', flex: 1 }}>
-            <NowPlaying media={mediaState} />
+          <div className="controls-layout-container">
+            <div className="controls-music-section">
+              <NowPlaying media={mediaState} />
+            </div>
             
-
-
-            {/* Profiles switch tabs (Only in Edit mode) */}
-            {isEditMode && config && (
-              <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px', borderBottom: '1px solid rgba(255,255,255,0.03)', padding: '8px 0' }}>
-                {config.profiles.map(p => (
-                  <button
-                    key={p.id}
-                    onClick={async () => {
-                      const newCfg = { ...config, activeProfileId: p.id };
-                      setConfig(newCfg);
-                      await saveDeckConfig(newCfg);
-                    }}
-                    style={{
-                      background: config.activeProfileId === p.id ? '#181a1e' : 'rgba(255,255,255,0.02)',
-                      color: config.activeProfileId === p.id ? '#fff' : 'var(--text-secondary)',
-                      border: config.activeProfileId === p.id ? '1px solid rgba(99, 102, 241, 0.35)' : '1px solid rgba(255,255,255,0.05)',
-                      boxShadow: config.activeProfileId === p.id ? '0 0 12px -2px rgba(99, 102, 241, 0.2)' : 'none',
-                      padding: '6px 12px',
-                      borderRadius: '16px',
-                      cursor: 'pointer',
-                      fontSize: '12px',
-                      fontWeight: 600,
-                      transition: 'all var(--transition-fast)'
-                    }}
+            <div className="controls-grid-section">
+              {/* Profiles switch tabs (Only in Edit mode) */}
+              {isEditMode && config && (
+                <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px', borderBottom: '1px solid rgba(255,255,255,0.03)', padding: '8px 0' }}>
+                  {config.profiles.map(p => (
+                    <button
+                      key={p.id}
+                      onClick={async () => {
+                        const newCfg = { ...config, activeProfileId: p.id };
+                        setConfig(newCfg);
+                        await saveDeckConfig(newCfg);
+                      }}
+                      style={{
+                        background: config.activeProfileId === p.id ? '#181a1e' : 'rgba(255,255,255,0.02)',
+                        color: config.activeProfileId === p.id ? '#fff' : 'var(--text-secondary)',
+                        border: config.activeProfileId === p.id ? '1px solid rgba(99, 102, 241, 0.35)' : '1px solid rgba(255,255,255,0.05)',
+                        boxShadow: config.activeProfileId === p.id ? '0 0 12px -2px rgba(99, 102, 241, 0.2)' : 'none',
+                        padding: '6px 12px',
+                        borderRadius: '16px',
+                        cursor: 'pointer',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        transition: 'all var(--transition-fast)'
+                      }}
+                    >
+                      {p.name}
+                    </button>
+                  ))}
+                  <button 
+                    onClick={() => setIsProfileModalOpen(true)}
+                    style={{ background: 'none', border: '1px dashed var(--border-color)', color: 'var(--text-secondary)', padding: '4px 10px', borderRadius: '16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px' }}
                   >
-                    {p.name}
+                    <Plus size={12} /> New
                   </button>
-                ))}
-                <button 
-                  onClick={() => setIsProfileModalOpen(true)}
-                  style={{ background: 'none', border: '1px dashed var(--border-color)', color: 'var(--text-secondary)', padding: '4px 10px', borderRadius: '16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px' }}
-                >
-                  <Plus size={12} /> New
-                </button>
-              </div>
-            )}
+                </div>
+              )}
 
-            {/* Main Button Grid */}
-            {activeProfile ? (
-              <main style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                <ButtonGrid
-                  profile={activeProfile}
-                  isEditMode={isEditMode}
-                  onExecute={handleExecuteAction}
-                  onConfigureButton={handleConfigureButton}
-                  onUpdateButtons={handleUpdateButtonsDirectly}
-                />
-              </main>
-            ) : (
-              <div style={{ textAlign: 'center', padding: '40px' }}>Loading configuration...</div>
-            )}
+              {/* Main Button Grid */}
+              {activeProfile ? (
+                <main style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                  <ButtonGrid
+                    profile={activeProfile}
+                    isEditMode={isEditMode}
+                    onExecute={handleExecuteAction}
+                    onConfigureButton={handleConfigureButton}
+                    onUpdateButtons={handleUpdateButtonsDirectly}
+                  />
+                </main>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '40px' }}>Loading configuration...</div>
+              )}
+            </div>
           </div>
         )}
         {activeSection === 'performance' && (
