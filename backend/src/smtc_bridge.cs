@@ -260,7 +260,7 @@ class SmtcBridge
                     var contentTypeProp = streamType.GetProperty("ContentType");
                     string contentType = contentTypeProp != null ? (string)contentTypeProp.GetValue(stream) : "unknown";
                     
-                    Console.WriteLine("{\"log\": \"Thumbnail fetched: size=\" + size + \" bytes, type=\" + contentType}");
+                    Console.WriteLine("{\"log\": \"Thumbnail fetched: size=" + size + " bytes, type=" + contentType + "\"}");
                     if (size > 0)
                     {
                         var dataReader = Activator.CreateInstance(dataReaderType, new object[] { stream });
