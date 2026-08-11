@@ -162,7 +162,7 @@ export const NowPlaying: React.FC<NowPlayingProps> = ({ media }) => {
         {/* Playback Controls centered below progress bar */}
         <div className="now-playing-controls">
           <button className="now-playing-btn" onClick={() => handleAction('previous')} title="Previous">
-            <SkipBack size={20} fill="currentColor" stroke="none" />
+            <SkipBack size={18} fill="currentColor" stroke="none" />
           </button>
           
           <button 
@@ -171,14 +171,14 @@ export const NowPlaying: React.FC<NowPlayingProps> = ({ media }) => {
             title={status === 'Playing' ? 'Pause' : 'Play'}
           >
             {status === 'Playing' ? (
-              <Pause size={22} fill="currentColor" stroke="none" />
+              <Pause size={18} fill="currentColor" stroke="none" />
             ) : (
-              <Play size={22} fill="currentColor" stroke="none" style={{ transform: 'translateX(1.5px)' }} />
+              <Play size={18} fill="currentColor" stroke="none" style={{ transform: 'translateX(1px)' }} />
             )}
           </button>
 
           <button className="now-playing-btn" onClick={() => handleAction('next')} title="Next">
-            <SkipForward size={20} fill="currentColor" stroke="none" />
+            <SkipForward size={18} fill="currentColor" stroke="none" />
           </button>
         </div>
       </div>
