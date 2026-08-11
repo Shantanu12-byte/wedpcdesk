@@ -34,6 +34,10 @@
   "build": {
     "appId": "com.webpcdeck.app",
     "productName": "WebPCDeck",
+    "asar": true,
+    "asarUnpack": [
+      "ngrok.exe"
+    ],
     "directories": {
       "output": "dist-app"
     },
@@ -41,10 +45,12 @@
       "main.js",
       "package.json",
       "tray_icon.png",
+      "ngrok.exe",
       "shared/**/*",
       "backend/dist/**/*",
       "backend/package.json",
       "backend/node_modules/**/*",
+      "!backend/node_modules/webpcdeck-root",
       "frontend/dist/**/*"
     ],
     "win": {

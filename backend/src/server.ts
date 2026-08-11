@@ -12,6 +12,24 @@ import { loadConfig, saveConfig } from './config';
 import { WindowsActionExecutor } from './actions/windows';
 import { ActionConfig, DeckConfig } from '../../shared/types';
 
+// Load .env.local from project root (two levels up from backend/src)
+const envPath = path.join(__dirname, '..', '..', '.env.local');
+if (fs.existsSync(envPath)) {
+  const envContent = fs.readFileSync(envPath, 'utf-8');
+  for (const line of envContent.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const eqIdx = trimmed.indexOf('=');
+    if (eqIdx === -1) continue;
+    const key = trimmed.slice(0, eqIdx).trim();
+    const value = trimmed.slice(eqIdx + 1).trim().replace(/^["']|["']$/g, '');
+    if (key && !(key in process.env)) {
+      process.env[key] = value;
+    }
+  }
+}
+
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -41,72 +59,107 @@ function getLanIp(): string {
 
 const LAN_IP = getLanIp();
 
-let cloudflaredProcess: any = null;
+let ngrokProcess: any = null;
 let activeTunnelUrl: string | null = null;
 
-function startCloudflaredTunnel() {
-  console.log('[Tunnel] Starting cloudflared quick tunnel...');
-  
-  let binName = 'cloudflared';
-  const localPaths = [
-    path.join(process.cwd(), 'cloudflared.exe'),
-    path.join(process.cwd(), '..', 'cloudflared.exe'),
-    path.join(__dirname, '..', '..', 'cloudflared.exe'),
-    path.join(__dirname, '..', '..', '..', 'cloudflared.exe'),
-    path.join(__dirname, '..', '..', '..', '..', 'cloudflared.exe')
-  ];
-
-  for (const p of localPaths) {
-    if (fs.existsSync(p)) {
-      binName = p;
-      console.log(`[Tunnel] Found local cloudflared executable at: ${binName}`);
-      break;
-    }
+function logDebug(msg: string) {
+  const logPath = path.join(os.tmpdir(), 'webpcdeck-tunnel.log');
+  const timestamp = new Date().toISOString();
+  try {
+    fs.appendFileSync(logPath, `[${timestamp}] ${msg}\n`);
+  } catch (e) {
+    // Ignore log write errors
   }
-
-  cloudflaredProcess = spawn(binName, ['tunnel', '--url', `http://localhost:${PORT}`], {
-    shell: true,
-  });
-
-  cloudflaredProcess.stdout.on('data', (data: Buffer) => {
-    console.log(`[Tunnel stdout] ${data.toString().trim()}`);
-    parseTunnelUrl(data.toString());
-  });
-
-  cloudflaredProcess.stderr.on('data', (data: Buffer) => {
-    console.error(`[Tunnel stderr] ${data.toString().trim()}`);
-    parseTunnelUrl(data.toString());
-  });
-
-  cloudflaredProcess.on('error', (err: any) => {
-    console.error('[Tunnel] Failed to start cloudflared process:', err.message);
-  });
-
-  cloudflaredProcess.on('close', (code: number) => {
-    console.log(`[Tunnel] cloudflared process exited with code ${code}`);
-    activeTunnelUrl = null;
-    cloudflaredProcess = null;
-  });
+  console.log(msg);
 }
 
-function parseTunnelUrl(text: string) {
-  const match = text.match(/https:\/\/[a-zA-Z0-9-]+\.trycloudflare\.com/);
-  if (match) {
-    activeTunnelUrl = match[0];
-    console.log(`\n==========================================`);
-    console.log(`☁️ CLOUDFLARE TUNNEL ACTIVE: ${activeTunnelUrl}`);
-    console.log(`==========================================\n`);
+function findNgrok(): string | null {
+  const candidates = [
+    path.join(process.cwd(), 'ngrok.exe'),
+    path.join(process.cwd(), '..', 'ngrok.exe'),
+    path.join(__dirname, '..', '..', 'ngrok.exe'),
+    path.join(__dirname, '..', '..', '..', 'ngrok.exe'),
+    path.join(__dirname, '..', '..', '..', '..', 'ngrok.exe'),
+    path.join(__dirname, '..', '..', '..', '..', 'app.asar.unpacked', 'ngrok.exe'),
+    path.join(path.dirname(process.execPath), 'resources', 'app.asar.unpacked', 'ngrok.exe'),
+    path.join(path.dirname(process.execPath), 'ngrok.exe'),
+    'ngrok', // fallback: system PATH
+  ];
+
+  logDebug(`[Tunnel] Searching for ngrok.exe...`);
+  for (const p of candidates) {
+    if (p === 'ngrok') continue; // skip PATH check in loop
+    const exists = fs.existsSync(p);
+    logDebug(`[Tunnel] Checking: ${p} (exists: ${exists})`);
+    if (exists) return p;
   }
+  // Try system PATH as last resort
+  return 'ngrok';
+}
+
+function startNgrokTunnel() {
+  const authToken = process.env.NGROK_AUTH_TOKEN;
+  const staticDomain = process.env.NGROK_STATIC_DOMAIN;
+
+  if (!authToken || !staticDomain) {
+    logDebug('[Tunnel] ⚠️  NGROK_AUTH_TOKEN or NGROK_STATIC_DOMAIN not set in environment. Tunnel not started.');
+    logDebug('[Tunnel] Add these to your .env.local file to enable the permanent tunnel.');
+    return;
+  }
+
+  const ngrokBin = findNgrok();
+  if (!ngrokBin) {
+    logDebug('[Tunnel] ❌ ngrok executable not found. Place ngrok.exe in c:\\webpcdeck\\');
+    return;
+  }
+
+  // Since we have a static domain, the URL is known immediately — set it now
+  activeTunnelUrl = `https://${staticDomain}`;
+  logDebug(`🔗 NGROK PERMANENT TUNNEL URL: ${activeTunnelUrl}`);
+
+  const args = [
+    'http',
+    `--authtoken=${authToken}`,
+    `--domain=${staticDomain}`,
+    `${PORT}`,
+    '--log=stdout',
+    '--log-format=json',
+  ];
+
+  logDebug(`[Tunnel] Spawning: ${ngrokBin} ${args.slice(0, -2).join(' ')} ${PORT} ...`);
+
+  ngrokProcess = spawn(ngrokBin, args, { shell: false });
+
+  ngrokProcess.stdout.on('data', (data: Buffer) => {
+    const text = data.toString().trim();
+    logDebug(`[ngrok stdout] ${text}`);
+  });
+
+  ngrokProcess.stderr.on('data', (data: Buffer) => {
+    const text = data.toString().trim();
+    logDebug(`[ngrok stderr] ${text}`);
+  });
+
+  ngrokProcess.on('error', (err: any) => {
+    logDebug(`[Tunnel error] Failed to start ngrok: ${err.message}`);
+    activeTunnelUrl = null;
+  });
+
+  ngrokProcess.on('close', (code: number) => {
+    logDebug(`[Tunnel close] ngrok exited with code ${code}`);
+    activeTunnelUrl = null;
+    ngrokProcess = null;
+  });
 }
 
 function cleanupTunnel() {
-  if (cloudflaredProcess) {
-    console.log('[Tunnel] Terminating cloudflared process...');
+  if (ngrokProcess) {
+    console.log('[Tunnel] Terminating ngrok process...');
     try {
       if (process.platform === 'win32') {
-        exec(`taskkill /pid ${cloudflaredProcess.pid} /t /f`, () => {});
+        exec(`taskkill /pid ${ngrokProcess.pid} /t /f`, () => {});
       } else {
-        cloudflaredProcess.kill();
+        ngrokProcess.kill();
       }
     } catch (e) {
       // ignore
@@ -374,7 +427,7 @@ if (!process.env.VERCEL) {
     console.log(`\n==========================================`);
     console.log(`🔑 ACTIVE PAIRING CODE: ${auth.getPairingCode()}`);
     console.log(`==========================================\n`);
-    startCloudflaredTunnel();
+    startNgrokTunnel();
   });
 }
 

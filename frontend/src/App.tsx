@@ -183,6 +183,11 @@ const App: React.FC = () => {
 
   useEffect(() => {
     checkStatus();
+    // Poll status every 3 seconds to retrieve active Cloudflare Tunnel URL when it finishes starting up
+    const statusInterval = setInterval(() => {
+      checkStatus();
+    }, 3000);
+    return () => clearInterval(statusInterval);
   }, []);
 
   // 2. Initialize WebSocket once paired/loaded (only for real-time config sync)

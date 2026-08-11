@@ -1,6 +1,7 @@
 const { app, BrowserWindow, Tray, Menu, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 
 let mainWindow = null;
 let tray = null;
@@ -9,15 +10,31 @@ let isQuitting = false;
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 
 // Start the backend server (production mode only; dev mode uses ts-node-dev separately)
+const logPath = path.join(os.tmpdir(), 'webpcdeck-main.log');
+function logMain(msg) {
+  const timestamp = new Date().toISOString();
+  try {
+    fs.appendFileSync(logPath, `[${timestamp}] ${msg}\n`);
+  } catch (e) {}
+}
+
+logMain(`Starting WebPCDeck. isDev = ${isDev}`);
 if (!isDev) {
   const backendPath = path.join(__dirname, 'backend', 'dist', 'backend', 'src', 'server.js');
+  logMain(`backendPath: ${backendPath}`);
+  logMain(`backendPath exists: ${fs.existsSync(backendPath)}`);
   if (fs.existsSync(backendPath)) {
-    require(backendPath);
+    try {
+      require(backendPath);
+      logMain(`Successfully required backendPath`);
+    } catch (err) {
+      logMain(`Error requiring backendPath: ${err.message}\nStack: ${err.stack}`);
+    }
   } else {
-    console.log('Backend compiled server not found.');
+    logMain('Backend compiled server not found.');
   }
 } else {
-  console.log('Running in Development mode: Backend is handled by concurrent ts-node-dev watcher.');
+  logMain('Running in Development mode: Backend is handled by concurrent ts-node-dev watcher.');
 }
 
 // Build a tray icon purely from a data URL — no file required, never fails to load

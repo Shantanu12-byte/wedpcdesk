@@ -48,7 +48,7 @@ export function getWsUrl(): string {
   const tokenParam = token ? `?token=${encodeURIComponent(token)}` : '';
   const host = getBackendHost();
 
-  if (host.includes('ngrok') || host.includes('loca.lt') || host.includes('trycloudflare.com')) {
+  if (host.includes('ngrok') || host.includes('loca.lt') || host.includes('ngrok-free.dev')) {
     const isSecure = window.location.protocol === 'https:' || localStorage.getItem('webpcdeck_backend_ip')?.startsWith('https');
     const protocol = isSecure ? 'wss' : 'ws';
     return `${protocol}://${host}/ws${tokenParam}`;
