@@ -207,14 +207,27 @@ function startSmtcBridge() {
       break;
     }
   }
-  const exePath = path.join(__dirname, 'smtc_bridge.exe');
+  const exeCandidates = [
+    path.join(__dirname, 'smtc_bridge.exe'),
+    path.join(process.cwd(), 'backend', 'src', 'smtc_bridge.exe'),
+    path.join((process as any).resourcesPath || '', 'app.asar.unpacked', 'backend', 'src', 'smtc_bridge.exe'),
+    path.join(__dirname, '..', '..', '..', '..', 'backend', 'src', 'smtc_bridge.exe').replace('app.asar', 'app.asar.unpacked')
+  ];
+
+  let exePath = '';
+  for (const c of exeCandidates) {
+    if (fs.existsSync(c)) {
+      exePath = c;
+      break;
+    }
+  }
 
   const spawnBridge = () => {
-    if (!fs.existsSync(exePath)) {
+    if (!exePath) {
       console.error('[SMTC] smtc_bridge.exe not found. Media integration disabled.');
       return;
     }
-    console.log('[SMTC] Spawning smtc_bridge.exe...');
+    console.log('[SMTC] Spawning smtc_bridge.exe from path:', exePath);
     smtcProcess = spawn(exePath, [], { shell: false });
 
     const rl = readline.createInterface({
