@@ -3,6 +3,7 @@ import { DeckConfig, Profile, ButtonConfig, ServerState } from '../../shared/typ
 import ButtonGrid from './components/ButtonGrid';
 import EditModal from './components/EditModal';
 import ConfirmModal from './components/ConfirmModal';
+import { NowPlaying, MediaState } from './components/NowPlaying';
 import { 
   getServerState, 
   pairWithCode, 
@@ -43,6 +44,7 @@ const App: React.FC = () => {
   const [config, setConfig] = useState<DeckConfig | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [isWsConnected, setIsWsConnected] = useState(false);
+  const [mediaState, setMediaState] = useState<MediaState | null>(null);
   
   // Auth state
   const [isPaired, setIsPaired] = useState(() => {
@@ -198,6 +200,8 @@ const App: React.FC = () => {
       (msg) => {
         if (msg.type === 'init' || msg.type === 'config_update') {
           setConfig(msg.config);
+        } else if (msg.type === 'media_update') {
+          setMediaState(msg.media);
         } else if (msg.type === 'action_result') {
           if (!msg.success) {
             showToast(`Action failed: ${msg.error || 'Unknown error'}`, 'error');
@@ -795,6 +799,7 @@ const App: React.FC = () => {
         {/* Controls Screen */}
         {activeSection === 'controls' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '28px', flex: 1 }}>
+            <NowPlaying media={mediaState} />
             
 
 

@@ -239,3 +239,12 @@ export async function getPerformanceMetrics(): Promise<PerformanceData> {
   if (!res.ok) throw new Error('Failed to get performance metrics');
   return res.json();
 }
+
+export async function controlMedia(action: 'play' | 'pause' | 'next' | 'previous'): Promise<void> {
+  const res = await fetch(`${getBaseUrl()}/api/media/control`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({ action }),
+  });
+  if (!res.ok) throw new Error('Failed to control media playback');
+}

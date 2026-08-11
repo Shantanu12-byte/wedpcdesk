@@ -40,3 +40,4 @@ config.json
 .env*.local
 
 dist-app/
+backend/src/smtc_bridge.exe

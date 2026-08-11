@@ -7,6 +7,7 @@ import { exec, spawn } from 'child_process';
 import url from 'url';
 import path from 'path';
 import fs from 'fs';
+import readline from 'readline';
 import { auth } from './auth';
 import { loadConfig, saveConfig } from './config';
 import { WindowsActionExecutor } from './actions/windows';
@@ -189,18 +190,121 @@ function cleanupTunnel() {
   }
 }
 
+let smtcProcess: any = null;
+let latestMediaState: any = { active: false };
+
+function startSmtcBridge() {
+  const cscPath = 'C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe';
+  const srcCandidates = [
+    path.join(__dirname, 'smtc_bridge.cs'),
+    path.join(__dirname, '..', '..', 'src', 'smtc_bridge.cs'),
+    path.join(process.cwd(), 'backend', 'src', 'smtc_bridge.cs'),
+  ];
+  let srcPath = '';
+  for (const c of srcCandidates) {
+    if (fs.existsSync(c)) {
+      srcPath = c;
+      break;
+    }
+  }
+  const exePath = path.join(__dirname, 'smtc_bridge.exe');
+
+  const spawnBridge = () => {
+    if (!fs.existsSync(exePath)) {
+      console.error('[SMTC] smtc_bridge.exe not found. Media integration disabled.');
+      return;
+    }
+    console.log('[SMTC] Spawning smtc_bridge.exe...');
+    smtcProcess = spawn(exePath, [], { shell: false });
+
+    const rl = readline.createInterface({
+      input: smtcProcess.stdout,
+      terminal: false
+    });
+
+    rl.on('line', (line) => {
+      const trimmed = line.trim();
+      if (!trimmed) return;
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (parsed.log) {
+          console.log('[SMTC Log]', parsed.log);
+        } else if (parsed.error) {
+          console.error('[SMTC Bridge Error]', parsed.error);
+        } else {
+          latestMediaState = parsed;
+          broadcastToAll({ type: 'media_update', media: latestMediaState });
+        }
+      } catch (e) {
+        console.log('[SMTC stdout]', trimmed);
+      }
+    });
+
+    smtcProcess.stderr.on('data', (data: Buffer) => {
+      console.error('[SMTC stderr]', data.toString().trim());
+    });
+
+    smtcProcess.on('close', (code: number) => {
+      console.log(`[SMTC] Process exited with code ${code}. Restarting in 5s...`);
+      smtcProcess = null;
+      setTimeout(spawnBridge, 5000);
+    });
+  };
+
+  if (fs.existsSync(cscPath) && fs.existsSync(srcPath)) {
+    console.log('[SMTC] Compiling smtc_bridge.cs...');
+    const args = [
+      '/r:System.Runtime.dll',
+      '/r:System.Runtime.InteropServices.WindowsRuntime.dll',
+      '/r:System.Runtime.WindowsRuntime.dll',
+      '/r:C:\\Windows\\System32\\WinMetadata\\Windows.Media.winmd',
+      '/r:C:\\Windows\\System32\\WinMetadata\\Windows.Foundation.winmd',
+      '/r:C:\\Windows\\System32\\WinMetadata\\Windows.Storage.winmd',
+      `/out:${exePath}`,
+      srcPath
+    ];
+    const compileProc = spawn(cscPath, args, { shell: false });
+    compileProc.on('close', (code) => {
+      if (code === 0) {
+        console.log('[SMTC] Compilation successful.');
+      } else {
+        console.error('[SMTC] Compilation failed with code', code);
+      }
+      spawnBridge();
+    });
+  } else {
+    spawnBridge();
+  }
+}
+
+function cleanupSmtc() {
+  if (smtcProcess) {
+    console.log('[SMTC] Terminating SMTC process...');
+    try {
+      if (process.platform === 'win32') {
+        exec(`taskkill /pid ${smtcProcess.pid} /t /f`, () => {});
+      } else {
+        smtcProcess.kill();
+      }
+    } catch (e) {}
+  }
+}
+
 process.on('SIGINT', () => {
   cleanupTunnel();
+  cleanupSmtc();
   process.exit(0);
 });
 
 process.on('SIGTERM', () => {
   cleanupTunnel();
+  cleanupSmtc();
   process.exit(0);
 });
 
 process.on('exit', () => {
   cleanupTunnel();
+  cleanupSmtc();
 });
 
 
@@ -359,6 +463,20 @@ app.post('/api/action', async (req: Request, res: Response) => {
   }
 });
 
+// Control media via C# SMTC bridge
+app.post('/api/media/control', (req: Request, res: Response) => {
+  const { action } = req.body;
+  if (!action) {
+    return res.status(400).json({ error: 'Action is required' });
+  }
+  if (smtcProcess && smtcProcess.stdin) {
+    smtcProcess.stdin.write(`${action}\n`);
+    res.json({ success: true });
+  } else {
+    res.status(503).json({ error: 'SMTC bridge is not running' });
+  }
+});
+
 // WebSocket Server Integration
 server.on('upgrade', (request, socket, head) => {
   const parsedUrl = url.parse(request.url || '', true);
@@ -392,6 +510,9 @@ wss.on('connection', (ws: WebSocket, request: any) => {
 
   // Immediately send initial state
   ws.send(JSON.stringify({ type: 'init', config: loadConfig() }));
+  
+  // Immediately send the latest media state as well
+  ws.send(JSON.stringify({ type: 'media_update', media: latestMediaState }));
 
   // Note: WebSocket client-to-server messages are retired.
   // The connection is kept purely for pushing config updates to paired clients.
@@ -450,6 +571,7 @@ if (!process.env.VERCEL) {
     console.log(`🔑 ACTIVE PAIRING CODE: ${auth.getPairingCode()}`);
     console.log(`==========================================\n`);
     startNgrokTunnel();
+    startSmtcBridge();
   });
 }
 
