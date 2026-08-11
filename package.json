@@ -46,6 +46,7 @@
       "package.json",
       "tray_icon.png",
       "ngrok.exe",
+      ".env.local",
       "shared/**/*",
       "backend/dist/**/*",
       "backend/package.json",

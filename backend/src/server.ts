@@ -12,9 +12,23 @@ import { loadConfig, saveConfig } from './config';
 import { WindowsActionExecutor } from './actions/windows';
 import { ActionConfig, DeckConfig } from '../../shared/types';
 
-// Load .env.local from project root (two levels up from backend/src)
-const envPath = path.join(__dirname, '..', '..', '.env.local');
-if (fs.existsSync(envPath)) {
+// Load .env.local from project root or environment-specific locations
+const envCandidates = [
+  path.join(__dirname, '..', '..', '.env.local'), // Dev mode root
+  path.join(__dirname, '..', '..', '..', '..', '.env.local'), // Packaged app.asar root
+  path.join(process.cwd(), '.env.local'), // Current working directory
+  path.join(path.dirname(process.execPath), '.env.local'), // Next to executable
+];
+
+let envPath = '';
+for (const p of envCandidates) {
+  if (fs.existsSync(p)) {
+    envPath = p;
+    break;
+  }
+}
+
+if (envPath) {
   const envContent = fs.readFileSync(envPath, 'utf-8');
   for (const line of envContent.split('\n')) {
     const trimmed = line.trim();
@@ -28,6 +42,7 @@ if (fs.existsSync(envPath)) {
     }
   }
 }
+
 
 
 const app = express();
